@@ -110,6 +110,15 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .pop.w{color:#fff;text-shadow:0 0 16px rgba(200,230,255,1),0 2px 0 #000;font-size:26px}
 @keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
 .howto{font-size:13px;color:var(--muted);margin:0;text-align:center}
+.foe{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--well)}
+.pips{display:flex;gap:4px}
+.pips i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.pips i.done{background:var(--ember)}
+.pips i.now{background:var(--cpu);box-shadow:0 0 8px rgba(116,185,255,.7)}
+.foe-name{margin:0;font-family:var(--f-display);font-size:20px;line-height:1.3}
+.foe-name small{font-family:var(--f-data);font-size:12px;color:var(--muted);margin-right:8px}
+.foe-name span{color:var(--cpu)}
+.foe-hint{margin:0;font-size:13px;color:var(--muted)}
 .streak{font-family:var(--f-data);font-size:12px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:reduce){.shout.rec,.pop,.banner p.show{animation-duration:.01s}}
 </style>
@@ -153,7 +162,8 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
     </section>
 
     <section class="panel" aria-labelledby="arena-h">
-      <div class="label"><span id="arena-h">浮遊舞台</span><span id="lvTag">CPU Lv.1</span></div>
+      <div class="label"><span id="arena-h">道場破り</span><span id="lvTag">其の一</span></div>
+      <div class="foe" id="foe"><div class="pips" id="pips" aria-hidden="true"></div><p class="foe-name" id="foeName"></p><p class="foe-hint" id="foeHint"></p></div>
       <div class="vs">
         <div class="side"><div class="nm" id="pName">あなた</div><div class="hp"><i id="pHp"></i></div><div class="sp" id="pSp">—</div></div>
         <div class="mid"><b id="timer">0</b>舞台 <span id="ringPct">100</span>%</div>
@@ -163,11 +173,12 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
         <canvas id="arena" width="640" height="440" aria-label="決闘画面。開始前に舞台をタップすると出撃位置を決められる"></canvas>
         <div class="banner"><p id="banner"></p></div>
       </div>
-      <p class="howto">開始前に舞台の左半分をタップして<b>出撃位置</b>を決める。あとは剣が声のリズムで勝手に斬り合う。舞台は時間とともに崩れて狭くなり、<b>場外に落ちたら負け</b>。斬られて折れた剣は短くなるが、軽くなって速くなる。押されている側の折れた剣は相手の懐へ飛び込み、<b>柄を打てば大ダメージ</b>。</p>
+      <p class="howto">十人の剣士を順に倒す。負けたら叫び直して、同じ相手に何度でも挑める。開始前に舞台の左半分をタップして<b>出撃位置</b>を決める。あとは剣が声のリズムで勝手に斬り合う。舞台は時間とともに崩れて狭くなり、<b>場外に落ちたら負け</b>。斬られて折れた剣は短くなるが、軽くなって速くなる。押されている側の折れた剣は相手の懐へ飛び込み、<b>柄を打てば大ダメージ</b>。</p>
       <div class="row" style="justify-content:center">
         <button class="fight" id="fightBtn">決闘開始</button>
         <button class="fight" id="nextBtn" hidden>次の相手へ</button>
         <button id="retryBtn" hidden>叫び直して挑む</button>
+        <button id="resetBtn" hidden>最初から挑む</button>
         <button id="muteBtn" aria-pressed="false">音 ON</button>
         <a class="btn" id="shareBtn" href="#" target="_blank" rel="noopener">Xで自慢する</a>
       </div>
@@ -1146,7 +1157,10 @@ function rng(seed){let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let best=0;try{best=+localStorage.getItem('sakebi_best')||0}catch(e){}
-let streak=0,lastStreak=0,level=1,player=null,cpu=null,duel=null;
+let player=null,cpu=null,duel=null;
+const NUM=['一','二','三','四','五','六','七','八','九','十'];
+let dojo={idx:0,tries:0,best:0,cleared:false};try{dojo={...dojo,...JSON.parse(localStorage.getItem('sakebi_dojo')||'{}')}}catch(e){}
+function saveDojo(){try{localStorage.setItem('sakebi_dojo',JSON.stringify(dojo))}catch(e){}}
 
 /* ================= 声 → プロファイル ================= */
 function analyze(data,sr){
@@ -1797,10 +1811,47 @@ function drawFighter(f,dt,time){
 }
 
 /* ---- 試合進行 ---- */
-const CPU_WORDS=['ラーメン','おはよう','ヤッホー','いけー','どすこい','ぎゃー','いただきます','ファイト','にゃーん','たまやー','ばんざい','おっしゃ','はっ！はっ！','せーの','ちぇすと'];
+/* ---- 道場の10人 ---- */
+/* 道場の10人 */
+function mkEnv(parts,N=40){
+  // parts: [[開始,終了,高さ,形]] 形: 'flat'|'fall'|'rise'|'arch'
+  const e=Array(N).fill(0.03);
+  for(const [a,b,h,k='flat'] of parts){const i0=Math.round(a*N),i1=Math.round(b*N);for(let i=i0;i<i1;i++){const u=(i-i0)/Math.max(1,i1-i0-1);const v=k==='fall'?1-0.55*u:k==='rise'?0.45+0.55*u:k==='arch'?0.45+0.55*Math.sin(Math.PI*u):1;e[i]=Math.max(e[i],h*v)}}
+  return e;
+}
+const DOJO=[
+ {word:'えいっ',title:'門下生',hint:'短い一突きだけの、まだ未熟な剣。どんな叫びでも勝てるはず。',bonus:-0.1,
+  p:{env:mkEnv([[0,0.3,1,'fall'],[0.3,1,0.25,'fall']]),dur:0.5,pitchHz:330,peak:0.45,rough:0.15,clarity:0.85,curve:0,vib:0}},
+ {word:'やあっ、たあっ',title:'見習い',hint:'二連突き。手数で押してくる。',bonus:-0.05,
+  p:{env:mkEnv([[0,0.22,1,'fall'],[0.22,0.45,0.25],[0.55,0.78,0.95,'fall'],[0.78,1,0.25]]),dur:0.8,pitchHz:380,peak:0.55,rough:0.2,clarity:0.85,curve:0,vib:0}},
+ {word:'うおおおおおお',title:'長刀使い',hint:'長刀。遠くから薙ぎ払う。重い剣で押し切れ。',bonus:0.06,
+  p:{env:mkEnv([[0,1,0.75,'arch']]),dur:1.85,pitchHz:300,peak:0.6,rough:0.1,clarity:0.85,curve:0.4,vib:0}},
+ {word:'あ゛あ゛あ゛あ゛',title:'波刃の亡霊',hint:'波刃。斬られた傷がしばらく痛む。速い剣で短期決戦を。',bonus:0.08,
+  p:{env:mkEnv([[0,1,0.85,'arch']]),dur:1.3,pitchHz:260,peak:0.6,rough:0.25,clarity:0.7,curve:-0.3,vib:0.9}},
+ {word:'どすこーい',title:'力士',hint:'不動。ほとんど吹き飛ばない。威力の高い剛剣でへし折れ。',bonus:-0.06,
+  p:{env:mkEnv([[0,0.3,1],[0.3,1,0.95,'arch']]),dur:0.9,pitchHz:150,peak:0.7,rough:0.08,clarity:0.8,curve:-0.5,vib:0}},
+ {word:'ちぇすとおっ',title:'剛剣',hint:'剛剣。一撃で刃をへし折る。大振りなので、疾風ならかわせる。',bonus:0.1,
+  p:{env:mkEnv([[0,0.3,1,'fall'],[0.3,0.55,0.3],[0.62,0.9,1,'fall'],[0.9,1,0.2]]),dur:0.8,pitchHz:280,peak:1,rough:0.65,clarity:0.75,curve:0.3,vib:0}},
+ {word:'ひゅっ',title:'風使い',hint:'疾風。速くてよくかわす。重い不動の剣で場外へ叩き出せ。',bonus:0.02,
+  p:{env:mkEnv([[0,0.25,0.9,'fall'],[0.25,0.45,0.2],[0.55,0.8,0.85,'fall'],[0.8,1,0.2]]),dur:0.5,pitchHz:1500,peak:0.55,rough:0.15,clarity:0.88,curve:0,vib:0}},
+ {word:'いざ、参る',title:'師範代',hint:'反った片刃の刀。会心が出やすく、隙がない。',bonus:0.18,
+  p:{env:mkEnv([[0,0.25,0.85,'fall'],[0.25,0.38,0.2],[0.42,1,0.9,'arch']]),dur:1.25,pitchHz:620,peak:0.75,rough:0.2,clarity:0.97,curve:0.9,vib:0}},
+ {word:'はっ！はっ！はっ！',title:'三段突き',hint:'枝刃の三連突き。刃を絡め取ってくる。疾風なら捌ける。',bonus:0.08,
+  p:{env:mkEnv([[0,0.22,1,'fall'],[0.38,0.6,1,'fall'],[0.76,0.98,1,'fall']]),dur:1.0,pitchHz:420,peak:0.75,rough:0.35,clarity:0.85,curve:0,vib:0}},
+ {word:'喝ッ！！',title:'道場主',hint:'剛剣と不動をあわせ持つ。剛剣か疾風でなければ歯が立たない。',bonus:0.2,
+  p:{env:mkEnv([[0,0.7,1,'flat'],[0.7,1,0.9,'fall']]),dur:1.1,pitchHz:190,peak:1,rough:0.7,clarity:0.8,curve:0.6,vib:0}}
+];
 function newCpu(){
-  const r=rng(hashStr('cpu'+level+Math.random())),w=CPU_WORDS[Math.floor(r()*CPU_WORDS.length)],boost=Math.min(1,(level-1)*0.1);
-  cpu=makeBlade(w,synthProfile(hashStr(w+level+r()),boost),-0.12+Math.min(0.4,(level-1)*0.06),'cpu');
+  const i=Math.min(dojo.idx,DOJO.length-1),d=DOJO[i];
+  cpu=makeBlade(d.word,JSON.parse(JSON.stringify(d.p)),d.bonus,'dojo'+i);
+  renderFoe();
+}
+function renderFoe(){
+  const i=Math.min(dojo.idx,DOJO.length-1),d=DOJO[i];
+  $('#pips').innerHTML=DOJO.map((_,k)=>`<i class="${k<dojo.idx||dojo.cleared?'done':k===i?'now':''}"></i>`).join('');
+  $('#foeName').innerHTML=dojo.cleared?'<small>道場制覇</small>全員を倒した':`<small>其の${NUM[i]}</small>${d.title}「<span>${d.word}</span>」`;
+  $('#foeHint').textContent=dojo.cleared?'「最初から挑む」で、別の叫びでもう一度。挑戦回数の少なさを競おう。':d.hint;
+  $('#lvTag').textContent=dojo.cleared?'制覇':`其の${NUM[i]} / 十`;
 }
 function cpuStart(){const a=(Math.random()-0.5)*1.4,r=90+Math.random()*130;return{x:Math.cos(a)*r,z:Math.sin(a)*r}}
 function resetDuel(){
@@ -1812,8 +1863,7 @@ function resetDuel(){
   duel={f:[makeFighter(player,arena.start.x,arena.start.z,1),makeFighter(cpu,cs.x,cs.z,-1)],time:0,running:false,ending:0,hitStop:0,slow:1,result:null,dtStep:0,stats:{hit:0,clash:0}};
   if(AV){buildFighterObj(duel.f[0],EMBER);buildFighterObj(duel.f[1],CPUC);arena.marker.visible=true}
   arena.focus=null;setBanner('出撃位置をタップで決める','hint');
-  $('#nextBtn').hidden=true;$('#retryBtn').hidden=true;$('#fightBtn').hidden=false;
-  $('#lvTag').textContent=`CPU Lv.${level}`;
+  $('#nextBtn').hidden=true;$('#retryBtn').hidden=true;$('#fightBtn').hidden=dojo.cleared;$('#resetBtn').hidden=!dojo.cleared;
   updateHud();
 }
 function setBanner(text,cls,sub){
@@ -1830,7 +1880,7 @@ function updateHud(){
   $('#cSp').textContent=[`刃 ${Math.round(c.lenFrac*100)}%`,typeName(cpu.segs),tn(cpu)].filter(Boolean).join(' ・ ');
   $('#timer').textContent=Math.floor(duel.time);
   $('#ringPct').textContent=Math.round(arena.ringR/R0*100);
-  $('#streak').textContent=`連勝 ${streak} ・ 自己ベスト ${best}`;
+  $('#streak').textContent=`${dojo.cleared?'道場制覇':dojo.idx+'人抜き'} ・ 挑戦 ${dojo.tries}回 ・ 最高 ${dojo.best}人抜き`;
 }
 function stepDuel(dt){
   const [p,c]=duel.f;duel.dtStep=dt;
@@ -1867,10 +1917,15 @@ function endDuel(pWin,how){
 }
 function finishDuel(){
   const {pWin,how}=duel.result;duel.running=false;duel.slow=1;arena.focus=null;
-  if(pWin){streak++;level++;if(streak>best){best=streak;try{localStorage.setItem('sakebi_best',best)}catch(e){}}
-    setBanner('勝利！','win',how);$('#nextBtn').hidden=false;$('#fightBtn').hidden=true;$('#retryBtn').hidden=true;}
-  else{setBanner('敗北…','lose',how);lastStreak=streak;streak=0;level=1;
-    $('#retryBtn').hidden=false;$('#fightBtn').hidden=false;$('#fightBtn').textContent='同じ剣で再戦';$('#nextBtn').hidden=true;}
+  dojo.tries++;
+  if(pWin){
+    dojo.idx++;dojo.best=Math.max(dojo.best,dojo.idx);
+    if(dojo.idx>=DOJO.length){dojo.cleared=true;dojo.idx=DOJO.length;setBanner('道場制覇！','win',`挑戦 ${dojo.tries}回で十人抜き`);$('#nextBtn').hidden=true;$('#resetBtn').hidden=false}
+    else{setBanner('勝利！','win',how);$('#nextBtn').hidden=false;$('#resetBtn').hidden=true}
+    $('#fightBtn').hidden=true;$('#retryBtn').hidden=true;}
+  else{setBanner('敗北…','lose',how+'　叫び直して、もう一度');
+    $('#retryBtn').hidden=false;$('#fightBtn').hidden=false;$('#fightBtn').textContent='同じ剣で再戦';$('#nextBtn').hidden=true;$('#resetBtn').hidden=true;}
+  saveDojo();renderFoe();
   updateHud();updateShare();
 }
 function updateArena(dt,time){
@@ -1927,8 +1982,9 @@ function startDuel(){
   shake(8);
 }
 $('#fightBtn').addEventListener('click',()=>{$('#fightBtn').textContent='決闘開始';startDuel()});
-$('#nextBtn').addEventListener('click',()=>{newCpu();resetDuel()});
-$('#retryBtn').addEventListener('click',()=>{newCpu();resetDuel();$('#fightBtn').textContent='決闘開始';shoutBtn.scrollIntoView({behavior:'smooth',block:'center'});shoutBtn.focus({preventScroll:true})});
+$('#nextBtn').addEventListener('click',()=>{newCpu();$('#fightBtn').textContent='決闘開始';resetDuel()});
+$('#resetBtn').addEventListener('click',()=>{dojo={...dojo,idx:0,tries:0,cleared:false};saveDojo();newCpu();$('#fightBtn').textContent='決闘開始';resetDuel();$('#resetBtn').hidden=true});
+$('#retryBtn').addEventListener('click',()=>{resetDuel();$('#fightBtn').textContent='決闘開始';shoutBtn.scrollIntoView({behavior:'smooth',block:'center'});shoutBtn.focus({preventScroll:true})});
 $('#muteBtn').addEventListener('click',e=>{muted=!muted;e.currentTarget.textContent=muted?'音 OFF':'音 ON';e.currentTarget.setAttribute('aria-pressed',String(muted))});
 
 /* ================= 鍛冶場UI ================= */
@@ -2001,9 +2057,9 @@ $('#sampleBtn').addEventListener('click',()=>{
   setPlayer(w,synthProfile(hashStr(w)^Math.floor(Math.random()*1e9)),'サンプルの剣');
 });
 function updateShare(){
-  const s=player.st.show,n=Math.max(streak,lastStreak);
+  const s=player.st.show;
   const tr=player.st.traits.map(k=>'異能・'+TRAITS[k].name).join(' ');
-  const txt=`「${player.name}」と叫んだら【${typeName(player.segs)}】${tr?tr+' ':''}の剣ができた。威力${s.power}/リーチ${s.reach}/速さ${s.speed}/重さ${s.weight}。CPUに${n}連勝。 #叫びブレード`;
+  const txt=`「${player.name}」と叫んだら【${typeName(player.segs)}】${tr?tr+' ':''}の剣ができた。威力${s.power}/リーチ${s.reach}/速さ${s.speed}/重さ${s.weight}。${dojo.cleared?`挑戦${dojo.tries}回で道場制覇！`:`道場${dojo.best}人抜き。`} #叫びブレード`;
   const url=/^https?:/.test(location.href)?location.href.split('#')[0]:'';
   $('#shareBtn').href='https://twitter.com/intent/tweet?text='+encodeURIComponent(txt)+(url?'&url='+encodeURIComponent(url):'');
 }
