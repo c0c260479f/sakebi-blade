@@ -1258,6 +1258,8 @@ let best=0;try{best=+localStorage.getItem('sakebi_best')||0}catch(e){}
 let player=null,cpu=null,duel=null;
 const NUM=['一','二','三','四','五','六','七','八','九','十'];
 let dojo={idx:0,tries:0,best:0,cleared:false};try{dojo={...dojo,...JSON.parse(localStorage.getItem('sakebi_dojo')||'{}')}}catch(e){}
+const DOJO_N=10;
+const dojoUnlocked=()=>dojo.best>=DOJO_N||dojo.cleared;
 function saveDojo(){try{localStorage.setItem('sakebi_dojo',JSON.stringify(dojo))}catch(e){}}
 
 /* ================= 声 → プロファイル ================= */
@@ -2037,7 +2039,7 @@ function newCpu(){
   renderFoe();
 }
 function renderFoe(){
-  const i=Math.min(dojo.idx,DOJO.length-1),d=DOJO[i],pick=dojo.cleared;
+  const i=Math.min(dojo.idx,DOJO.length-1),d=DOJO[i],pick=dojoUnlocked();
   $('#pips').className='pips'+(pick?' pick':'');
   $('#pips').innerHTML=DOJO.map((x,k)=>`<button type="button" data-i="${k}" class="${k<dojo.idx||dojo.cleared?'done':k===i?'now':''}" ${pick?`title="其の${NUM[k]} ${x.title}と戦う" aria-label="其の${NUM[k]} ${x.title}と戦う"`:'disabled tabindex="-1" aria-hidden="true"'}>${pick?NUM[k]:''}</button>`).join('');
   if(mode==='free'&&cpu){
@@ -2045,7 +2047,7 @@ function renderFoe(){
     $('#foeHint').textContent=cpu.hint||'';$('#lvTag').textContent='自由対戦';renderFoeSel();return;
   }
   $('#foeName').innerHTML=dojo.cleared?'<small>道場制覇</small>全員を倒した':`<small>其の${NUM[i]}</small>${d.title}「<span>${d.word}</span>」`;
-  $('#foeHint').textContent=dojo.cleared?'上の数字を押すと、その剣士と自由対戦できる。「最初から挑む」で、別の叫びでもう一度。':d.hint;
+  $('#foeHint').textContent=dojo.cleared?'上の数字を押すと、その剣士と自由対戦できる。「最初から挑む」で、別の叫びでもう一度。':d.hint+(dojoUnlocked()?'（上の数字を押すと自由対戦）':'');
   $('#lvTag').textContent=dojo.cleared?'制覇':`其の${NUM[i]} / 十`;
 }
 function cpuStart(){const a=(Math.random()-0.5)*1.4,r=90+Math.random()*130;return{x:Math.cos(a)*r,z:Math.sin(a)*r}}
@@ -2316,7 +2318,7 @@ function setMode(m){
 }
 function renderFoeSel(){
   const sel=$('#foeSel');if(!sel)return;
-  const lock=!dojo.cleared;
+  const lock=!dojoUnlocked();
   const g1=DOJO.map((d,i)=>`<option value="d:${i}"${lock?' disabled':''}>其の${NUM[i]} ${esc(d.title)}「${esc(d.word)}」${lock?'（道場制覇で解放）':''}</option>`).join('');
   const g2=vault.map(v=>`<option value="v:${v.id}">「${esc(v.name)}」${v.from==='letter'?'（果たし状）':v.id===playerVid?'（使用中）':''}</option>`).join('');
   sel.innerHTML=`<optgroup label="剣の保管庫">${g2||'<option disabled>（まだ剣がない）</option>'}</optgroup><optgroup label="道場の剣士">${g1}</optgroup>`;
@@ -2325,7 +2327,7 @@ function renderFoeSel(){
 $('#foeSel').addEventListener('change',async e=>{freeFoe=e.target.value;await applyFoe()});
 async function applyFoe(){
   if(mode!=='free'){newCpu();resetDuel();return}
-  if(!freeFoe||(freeFoe.startsWith('d:')&&!dojo.cleared)){freeFoe=vault[0]?'v:'+vault[0].id:null}
+  if(!freeFoe||(freeFoe.startsWith('d:')&&!dojoUnlocked())){freeFoe=vault[0]?'v:'+vault[0].id:null}
   if(!freeFoe){cpu=null;newCpuDojoFallback();renderFoe();resetDuel();return}
   if(freeFoe.startsWith('d:')){const i=+freeFoe.slice(2),d=DOJO[i];cpu=makeBlade(d.word,JSON.parse(JSON.stringify(d.p)),d.bonus,'dojo'+i);cpu.say=d.say;cpu.vox=d.vox;cpu.title=d.title;cpu.hint=d.hint}
   else{const v=vault.find(x=>'v:'+x.id===freeFoe);if(!v){freeFoe=null;return applyFoe()}cpu=await bladeFromVault(v);cpu.title=v.from==='letter'?'果たし状の剣':'保管庫の剣';cpu.hint=v.hasVoice?'自分の声で鍛えた剣。斬るたびにその叫びが響く。':'声のない剣。合成の声で叫ぶ。'}
@@ -2334,7 +2336,7 @@ async function applyFoe(){
 function newCpuDojoFallback(){const d=DOJO[0];cpu=makeBlade(d.word,JSON.parse(JSON.stringify(d.p)),d.bonus,'dojo0');cpu.say=d.say;cpu.vox=d.vox;cpu.title=d.title;cpu.hint='保管庫に剣がないので、門下生が相手をする。'}
 $('#modeDojo').addEventListener('click',()=>{if(mode==='dojo')return;setMode('dojo');newCpu();$('#fightBtn').textContent='決闘開始';resetDuel()});
 $('#modeFree').addEventListener('click',async()=>{if(mode==='free')return;setMode('free');renderFoeSel();await applyFoe()});
-$('#pips').addEventListener('click',async e=>{const bt=e.target.closest('button');if(!bt||!dojo.cleared)return;setMode('free');freeFoe='d:'+bt.dataset.i;renderFoeSel();await applyFoe()});
+$('#pips').addEventListener('click',async e=>{const bt=e.target.closest('button');if(!bt||!dojoUnlocked())return;setMode('free');freeFoe='d:'+bt.dataset.i;renderFoeSel();await applyFoe()});
 
 /* ================= 鍛冶場UI ================= */
 const STAT_LABELS=[['power','威力'],['reach','リーチ'],['speed','速さ'],['weight','重さ']];
