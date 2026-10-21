@@ -32,9 +32,28 @@ header{display:grid;gap:6px}
 h1{font-family:var(--f-display);font-weight:400;font-size:clamp(38px,8vw,72px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
 h1 span{color:var(--ember);text-shadow:0 0 28px rgba(255,138,42,.55)}
 header p{margin:0;color:var(--muted);max-width:64ch}
-.grid{display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.3fr);gap:20px;align-items:start}
-@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:14px;min-width:0}
+.grid{display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.3fr);grid-template-areas:"forge arena" "vault arena";grid-template-rows:auto 1fr;gap:20px;align-items:start}
+#pForge{grid-area:forge}#pVault{grid-area:vault}#pArena{grid-area:arena}
+.tabs{display:none}
+@media (max-width:899px){
+  .grid{grid-template-columns:minmax(0,1fr);grid-template-areas:none;grid-template-rows:none}
+  #pForge,#pVault,#pArena{grid-area:auto}
+  .tabs{display:flex;gap:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:6px;margin-block:-6px}
+  .tabs button{flex:1;justify-content:center;padding:10px 6px;font-weight:700}
+  .tabs button[aria-selected="true"]{background:var(--ember);color:var(--well);border-color:var(--ember)}
+  .tabs button span{font-family:var(--f-data);font-weight:400;font-size:12px;margin-left:4px;opacity:.8}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;background:var(--bg)}
+  .panel.tp{display:none}
+  body[data-tab="forge"] #pForge,body[data-tab="arena"] #pArena,body[data-tab="vault"] #pVault{display:grid}
+  h1{font-size:40px}
+  header p{font-size:13px}
+  body:not([data-tab="forge"]) header p{display:none}
+  body:not([data-tab="forge"]) h1{font-size:28px}
+  .wrap{gap:14px;padding-block:14px 40px}
+}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+.panel>*{min-width:0}
+.foe>*{min-width:0}
 .label{font-family:var(--f-data);font-size:11px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;gap:8px}
 .stage{position:relative;border-radius:8px;overflow:hidden;background:var(--well)}
 canvas{display:block;width:100%;height:auto}
@@ -53,11 +72,29 @@ button:disabled{opacity:.5;cursor:default}
 .meter{flex:1 1 120px;height:10px;border-radius:5px;background:var(--well);border:1px solid var(--line);overflow:hidden;min-width:100px}
 .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember),var(--ember-hi))}
 input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex:1 1 160px;min-width:0}
-.file{font-size:13px;color:var(--muted)}
-.file input{display:none}
-.file label{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.alt{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12px;color:var(--muted)}
+.alt input{display:none}
+.alt label,.link{cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--steel);background:none;border:0;padding:0;font:inherit;font-size:12px}
+.alt span{margin-right:auto}
+.sword-head{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;justify-content:space-between}
+.sword-head .type{font-family:var(--f-display);font-size:16px;color:var(--ember-hi)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips:empty{display:none}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--well);color:var(--steel)}
+.chip.tr{border-color:var(--ember);color:var(--ember-hi);font-weight:700}
+.more{border-top:1px solid var(--line);padding-top:8px}
+.more summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none;display:flex;align-items:center;gap:6px}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"";width:0;height:0;border:5px solid transparent;border-left:7px solid var(--muted);transition:transform .15s}
+.more[open] summary::before{transform:rotate(90deg) translateX(2px)}
+.more-body{display:grid;gap:12px;padding-top:10px}
+.fine{margin:0;font-size:12px;color:var(--muted)}
+.acts,.subacts{justify-content:center}
+.subacts{gap:6px}
+.sound-pop{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:center;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--well)}
+.sound-pop .vol{display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.sound-pop input[type=range]{width:110px;accent-color:var(--ember)}
 .small{padding:4px 10px;font-size:13px}
-.privacy{font-size:12px;color:var(--muted);margin:0}
 .note{font-size:13px;color:var(--ember-hi);margin:0}
 .stats{display:grid;gap:8px}
 .stat{display:grid;grid-template-columns:3.5em minmax(0,1fr) 2.2em;gap:10px;align-items:center;font-variant-numeric:tabular-nums}
@@ -110,14 +147,14 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .pop.w{color:#fff;text-shadow:0 0 16px rgba(200,230,255,1),0 2px 0 #000;font-size:26px}
 @keyframes pop{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
 .howto{font-size:13px;color:var(--muted);margin:0;text-align:center}
-.foe{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--well)}
+.foe{display:grid;gap:2px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--well)}
 .pips{display:flex;gap:4px}
-.foe-name{margin:0;font-family:var(--f-display);font-size:20px;line-height:1.3}
+.foe-name{margin:0;font-family:var(--f-display);font-size:18px;line-height:1.3}
 .foe-name small{font-family:var(--f-data);font-size:12px;color:var(--muted);margin-right:8px}
 .foe-name span{color:var(--cpu)}
 .foe-hint{margin:0;font-size:13px;color:var(--muted)}
 .modes{display:flex;gap:6px}
-.modes button{flex:1;padding:8px 10px;font-size:14px;justify-content:center}
+.modes button{flex:1;padding:6px 10px;font-size:14px;justify-content:center}
 .modes button[aria-pressed="true"]{background:var(--ember);color:var(--well);border-color:var(--ember);font-weight:700}
 .pips button{flex:1;height:6px;padding:0;border:0;border-radius:3px;background:var(--line);min-width:0;justify-content:center;align-items:center;line-height:1}
 .pips button.done{background:var(--ember)}
@@ -126,25 +163,24 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .pips.pick button:hover{background:var(--ember-hi)}
 .pips button:disabled{cursor:default}
 .foe-pick{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
-.foe-pick select{flex:1;min-width:0;font:inherit;color:var(--steel);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
-.vault{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
-.vault-help{margin:0;font-size:12px;color:var(--muted)}
-.vault-list{display:grid;gap:6px;max-height:300px;overflow:auto}
-.vault-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--well)}
+.foe-pick select{flex:1;min-width:0;width:100%;text-overflow:ellipsis;font:inherit;color:var(--steel);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.vault-list{display:grid;gap:6px;max-height:420px;overflow:auto}
+@media (max-width:899px){.vault-list{max-height:none}}
+.vault-item{border:1px solid var(--line);border-radius:8px;background:var(--well);overflow:hidden}
+.vault-item .vrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;width:100%;text-align:left;border:0;border-radius:0;background:none;padding:9px 12px}
+.vault-item .vrow .use{font-family:var(--f-data);font-size:11px;color:var(--ember-hi);align-self:center}
 .vault-item.on{border-color:var(--ember)}
 .vault-item .vn{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vault-item .vm{grid-column:1/-1;font-size:12px;color:var(--muted);font-family:var(--f-data);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vault-item .vb{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
-.vault-item .vb button{padding:3px 8px;font-size:12px}
+.vault-item .vm{grid-column:1/2;font-size:12px;color:var(--muted);font-family:var(--f-data);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vault-item .vb{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px}
+.vault-item .vb button{padding:6px 12px;font-size:13px}
+.vault-item .vb button.pri{background:var(--ember);color:var(--well);border-color:var(--ember)}
 .vault-item .tag{font-size:11px;color:var(--cpu);margin-left:6px;font-weight:400}
 .vault .none{font-size:12px;color:var(--muted)}
 .letter{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--well);display:grid;gap:8px}
 .letter p{margin:0;font-size:12px;color:var(--muted)}
 .letter input{flex:1 1 200px;font-family:var(--f-data);font-size:12px}
 .btn.small{padding:4px 10px;font-size:13px}
-.sound{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;justify-content:center;font-size:13px;color:var(--muted)}
-.sound .vol{display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
-.sound input[type=range]{width:110px;accent-color:var(--ember)}
 .streak{font-family:var(--f-data);font-size:12px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:reduce){.shout.rec,.pop,.banner p.show{animation-duration:.01s}}
 </style>
@@ -155,45 +191,60 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 <div class="wrap">
   <header>
     <h1>叫び<span>ブレード</span></h1>
-    <p>2秒だけ叫ぶと、その声の形が剣になり、その声のリズムが剣の斬り方になる。あとは剣が勝手に戦う。斬るたびに、あなたの叫びが響く。</p>
+    <p>2秒叫ぶと、その声の形が剣になり、声のリズムが斬り方になる。剣は勝手に戦う。</p>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="画面">
+    <button role="tab" id="tabForge" data-tab="forge" aria-selected="true">鍛冶場</button>
+    <button role="tab" id="tabArena" data-tab="arena" aria-selected="false">決闘</button>
+    <button role="tab" id="tabVault" data-tab="vault" aria-selected="false">保管庫<span id="tabVaultN"></span></button>
+  </nav>
+
   <div class="grid">
-    <section class="panel" aria-labelledby="forge-h">
+    <section class="panel tp" id="pForge" aria-labelledby="forge-h">
       <div class="label"><span id="forge-h">鍛冶場</span><span id="srcTag">サンプルの剣</span></div>
-      <div class="stage"><canvas id="forge" width="720" height="300" aria-label="鍛えた剣"></canvas></div>
-      <p class="swordname" id="swordName">名無しの剣</p>
-      <div class="readout" id="readout">—</div>
-      <div class="rhythm">
-        <div class="label"><span>斬撃のリズム</span><span id="cycleTag"></span></div>
-        <div class="strip" id="strip"></div>
-        <div><span class="type" id="typeName">—</span> <small id="typeHelp"></small></div>
-      </div>
-      <div class="shapes" id="shapes"></div>
-      <div class="stats" id="stats"></div>
-      <div class="traits" id="traits"></div>
       <div class="row"><input type="text" id="wordIn" maxlength="16" placeholder="叫ぶ言葉（剣の名前になる）"></div>
       <div class="row">
         <button class="shout" id="shoutBtn">押して叫ぶ</button>
         <div class="meter" aria-hidden="true"><i id="meter"></i></div>
       </div>
       <p class="note" id="note" hidden></p>
-      <p class="privacy">録音した声は、この端末のブラウザの中だけに保存され、どこにも送信されません。果たし状のURLにも声は含まれません。</p>
-      <div class="row file">
-        <span>マイクが使えないとき：</span>
+      <div class="alt">
+        <span>録音は端末の外に送られない</span>
         <input type="file" id="fileIn" accept="audio/*">
-        <label for="fileIn">音声ファイルから鍛える</label>
-        <button class="small" id="sampleBtn">サンプルの叫び</button>
+        <label for="fileIn">音声ファイルで鍛える</label>
+        <button class="link" id="sampleBtn">サンプルで試す</button>
       </div>
-      <div class="vault">
-        <div class="label"><span>剣の保管庫</span><span id="vaultCount"></span></div>
-        <p class="vault-help">鍛えた剣はここに残る。「使う」で自分の剣に、「相手に」で自由対戦の相手にできる。</p>
-        <div class="vault-list" id="vaultList"></div>
+      <div class="stage"><canvas id="forge" width="720" height="300" aria-label="鍛えた剣"></canvas></div>
+      <div class="sword-head">
+        <p class="swordname" id="swordName">名無しの剣</p>
+        <span class="type" id="typeName">—</span>
       </div>
+      <div class="chips" id="chips"></div>
+      <div class="stats" id="stats"></div>
+      <details class="more">
+        <summary>詳しく見る</summary>
+        <div class="more-body">
+          <div class="readout" id="readout">—</div>
+          <div class="rhythm">
+            <div class="label"><span>斬撃のリズム</span><span id="cycleTag"></span></div>
+            <div class="strip" id="strip"></div>
+            <small id="typeHelp"></small>
+          </div>
+          <div class="traits" id="traits"></div>
+          <div class="shapes" id="shapes"></div>
+          <p class="fine">録音した声はこのブラウザの中だけに保存され、どこにも送信されない。果たし状のURLにも声は入らない。</p>
+        </div>
+      </details>
     </section>
 
-    <section class="panel" aria-labelledby="arena-h">
-      <div class="label"><span id="arena-h">決闘</span><span id="lvTag">其の一</span></div>
+    <section class="panel tp" id="pVault" aria-labelledby="vault-h">
+      <div class="label"><span id="vault-h">剣の保管庫</span><span id="vaultCount"></span></div>
+      <div class="vault-list" id="vaultList"></div>
+    </section>
+
+    <section class="panel tp" id="pArena" aria-labelledby="arena-h">
+      <div class="label"><span id="arena-h">道場破り</span><span id="lvTag">其の一</span></div>
       <div class="modes" role="group" aria-label="対戦の形式"><button id="modeDojo" aria-pressed="true">道場破り</button><button id="modeFree" aria-pressed="false">自由対戦</button></div>
       <div class="foe" id="foe"><div class="pips" id="pips"></div><div class="foe-pick" id="foePick" hidden><label for="foeSel">相手</label><select id="foeSel"></select></div><p class="foe-name" id="foeName"></p><p class="foe-hint" id="foeHint"></p></div>
       <div class="vs">
@@ -205,25 +256,31 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
         <canvas id="arena" width="640" height="440" aria-label="決闘画面。開始前に舞台をタップすると出撃位置を決められる"></canvas>
         <div class="banner"><p id="banner"></p></div>
       </div>
-      <p class="howto" id="howto">十人の剣士を順に倒す。負けたら叫び直して、同じ相手に何度でも挑める。開始前に舞台の左半分をタップして<b>出撃位置</b>を決める。あとは剣が声のリズムで勝手に斬り合う。舞台は時間とともに崩れて狭くなり、<b>場外に落ちたら負け</b>。斬られて折れた剣は短くなるが、軽くなって速くなる。押されている側の折れた剣は相手の懐へ飛び込み、<b>柄を打てば大ダメージ</b>。</p>
-      <div class="row" style="justify-content:center">
+      <div class="row acts">
         <button class="fight" id="fightBtn">決闘開始</button>
         <button class="fight" id="nextBtn" hidden>次の相手へ</button>
-        <button id="retryBtn" hidden>叫び直して挑む</button>
+        <button id="retryBtn" hidden>叫び直す</button>
         <button id="resetBtn" hidden>最初から挑む</button>
-        <a class="btn" id="shareBtn" href="#" target="_blank" rel="noopener">Xで自慢する</a>
-        <button id="letterBtn">果たし状を出す</button>
       </div>
-      <div class="letter" id="letter" hidden>
-        <p>このURLを送ると、相手はあなたの剣と戦える（声は届かず、相手側では合成の声になる）。</p>
-        <div class="row"><input type="text" id="letterUrl" readonly aria-label="果たし状のURL"><button class="small" id="letterCopy">コピー</button><a class="btn small" id="letterX" href="#" target="_blank" rel="noopener">Xで送る</a></div>
+      <div class="row subacts">
+        <a class="btn small" id="shareBtn" href="#" target="_blank" rel="noopener">Xで自慢する</a>
+        <button class="small" id="letterBtn">果たし状を出す</button>
+        <button class="small" id="soundBtn" aria-expanded="false" aria-controls="soundPop">音量</button>
       </div>
-      <div class="sound" role="group" aria-label="音量">
+      <div class="sound-pop" id="soundPop" hidden>
         <button class="small" id="muteBtn" aria-pressed="false">音 ON</button>
         <span class="vol"><label for="volVoice">声</label><input type="range" id="volVoice" min="0" max="100" step="1" value="85"></span>
         <span class="vol"><label for="volSfx">効果音</label><input type="range" id="volSfx" min="0" max="100" step="1" value="70"></span>
       </div>
+      <div class="letter" id="letter" hidden>
+        <p>このURLを送ると、相手はあなたの剣と戦える。声は届かず、相手側では合成の声になる。</p>
+        <div class="row"><input type="text" id="letterUrl" readonly aria-label="果たし状のURL"><button class="small" id="letterCopy">コピー</button><a class="btn small" id="letterX" href="#" target="_blank" rel="noopener">Xで送る</a></div>
+      </div>
       <div class="streak" id="streak"></div>
+      <details class="more">
+        <summary>遊び方</summary>
+        <p class="howto" id="howto">十人の剣士を順に倒す。負けたら叫び直して、同じ相手に何度でも挑める。開始前に舞台の左半分をタップすると<b>出撃位置</b>を決められる。舞台は時間とともに崩れて狭くなり、<b>場外に落ちたら負け</b>。斬られて折れた剣は短くなるが、軽くなって速くなる。押されている側の折れた剣は相手の懐へ飛び込み、<b>柄を打てば大ダメージ</b>。</p>
+      </details>
     </section>
   </div>
 </div>
@@ -1524,7 +1581,7 @@ function makeView(canvas,aspect,bloom){
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
   renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
   renderer.outputEncoding=HAS_FX?THREE.LinearEncoding:THREE.sRGBEncoding;
-  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(36,aspect,1,5000);
+  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(36,1.5,1,5000);
   const v={renderer,scene,camera,composer:null};
   if(HAS_FX){
     const comp=new THREE.EffectComposer(renderer);
@@ -1534,11 +1591,11 @@ function makeView(canvas,aspect,bloom){
     v.composer=comp;
   }
   const resize=()=>{
-    const w=Math.max(200,canvas.parentElement.clientWidth),h=Math.round(w/aspect);
+    const asp=typeof aspect==='function'?aspect():aspect,w=Math.max(200,canvas.parentElement.clientWidth),h=Math.round(w/asp);
     renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
     if(v.composer){v.composer.setPixelRatio&&v.composer.setPixelRatio(renderer.getPixelRatio());v.composer.setSize(w,h)}
   };
-  resize();new ResizeObserver(resize).observe(canvas.parentElement);
+  resize();new ResizeObserver(resize).observe(canvas.parentElement);addEventListener('resize',resize);
   v.render=()=>v.composer?v.composer.render():renderer.render(scene,camera);
   return v;
 }
@@ -1671,7 +1728,7 @@ function updateForge(dt,time){
   forge.fire.intensity=2+Math.sin(time*7)*0.25+Math.sin(time*13.3)*0.18;
   forge.sparks.update(dt,()=>-104);
   forge.embers.update(dt,time);
-  FV.render();
+  if($('#forge').offsetParent!==null)FV.render();
 }
 
 /* ================= 浮遊舞台シーン ================= */
@@ -1679,7 +1736,7 @@ let AV=null;
 const SC=0.72,R0=310,R_MIN=115,SHRINK_START=5,SHRINK_RATE=7,MAX_TIME=80;
 const arena={sparks:null,embers:null,hitLight:null,shake:0,camPos:null,camTarget:null,focus:null,shards:[],shardGeo:null,danger:null,edge:null,ringR:R0,marker:null,start:{x:-150,z:40},torches:[]};
 function initArena(){
-  AV=makeView($('#arena'),640/440,[0.38,0.45,0.88]);
+  AV=makeView($('#arena'),()=>{if(!matchMedia('(max-width: 899px)').matches)return 640/392;const w=Math.min(innerWidth,900)-34,avail=innerHeight-445;return clamp(w/Math.max(180,avail),1.0,1.9)},[0.38,0.45,0.88]);
   const s=AV.scene;s.background=new THREE.Color(0x0c0907);s.fog=new THREE.Fog(0x0c0907,900,2000);
   arena.camHome=new THREE.Vector3(0,600,560);arena.lookHome=new THREE.Vector3(0,0,10);
   arena.camPos=arena.camHome.clone();arena.camTarget=arena.lookHome.clone();
@@ -2091,12 +2148,13 @@ function updateArena(dt,time){
   const pos=arena.camHome.clone(),look=arena.lookHome.clone();
   if(arena.focus){const w=arena.focus;look.set(w.x,w.y,w.z);pos.set(w.x*0.6,330,w.z*0.6+360)}
   else if(duel.running){const [p,c]=duel.f;const mx=(p.x+c.x)/2,mz=(p.z+c.z)/2,gap=Math.hypot(p.x-c.x,p.z-c.z);look.set(mx*0.5,0,mz*0.5);const k=clamp(0.55+gap/700+arena.ringR/R0*0.25,0.6,1.05);pos.set(mx*0.4,600*k,560*k+mz*0.4)}
+  {const af=clamp(1.55/AV.camera.aspect,1,1.6);pos.sub(look).multiplyScalar(af).add(look)} // 縦長・正方形の画面では引いて舞台を収める
   arena.camPos.lerp(pos,1-Math.pow(0.05,dt));arena.camTarget.lerp(look,1-Math.pow(0.05,dt));
   arena.shake*=Math.pow(0.004,dt);const sh=reduceMotion?0:arena.shake;
   AV.camera.position.set(arena.camPos.x+(Math.random()-.5)*sh,arena.camPos.y+(Math.random()-.5)*sh,arena.camPos.z+(Math.random()-.5)*sh);
   AV.camera.lookAt(arena.camTarget);
   if(duel.running)updateHud();
-  AV.render();
+  if($('#arena').offsetParent!==null)AV.render();
 }
 
 /* ---- 出撃位置と開始 ---- */
@@ -2131,7 +2189,7 @@ function startDuel(){
 $('#fightBtn').addEventListener('click',()=>{$('#fightBtn').textContent='決闘開始';startDuel()});
 $('#nextBtn').addEventListener('click',()=>{newCpu();$('#fightBtn').textContent='決闘開始';resetDuel()});
 $('#resetBtn').addEventListener('click',()=>{dojo={...dojo,idx:0,tries:0,cleared:false};saveDojo();newCpu();$('#fightBtn').textContent='決闘開始';resetDuel();$('#resetBtn').hidden=true});
-$('#retryBtn').addEventListener('click',()=>{resetDuel();$('#fightBtn').textContent='決闘開始';shoutBtn.scrollIntoView({behavior:'smooth',block:'center'});shoutBtn.focus({preventScroll:true})});
+$('#retryBtn').addEventListener('click',()=>{resetDuel();goTab('forge');$('#fightBtn').textContent='決闘開始';shoutBtn.scrollIntoView({behavior:'smooth',block:'center'});shoutBtn.focus({preventScroll:true})});
 function saveVol(){try{localStorage.setItem('sakebi_vol',JSON.stringify(vol))}catch(e){}}
 function syncVolUI(){$('#muteBtn').textContent=vol.muted?'音 OFF':'音 ON';$('#muteBtn').setAttribute('aria-pressed',String(vol.muted));$('#volVoice').value=Math.round(vol.voice*100);$('#volSfx').value=Math.round(vol.sfx*100)}
 $('#muteBtn').addEventListener('click',()=>{vol.muted=!vol.muted;muted=vol.muted;applyVol();syncVolUI();saveVol()});
@@ -2141,6 +2199,19 @@ $('#volSfx').addEventListener('input',e=>{vol.sfx=e.target.value/100;applyVol();
 $('#volVoice').addEventListener('change',()=>{if(vol.muted)return;ac();const b=player;shout(AC,voiceBus,AC.currentTime+0.02,moraFor(b,0,1).slice(0,3),0.5,voiceOf(b),{gain:0.5})});
 $('#volSfx').addEventListener('change',()=>{if(vol.muted)return;ac();sfx('clash',0,1)});
 syncVolUI();
+$('#soundBtn').addEventListener('click',()=>{const h=!$('#soundPop').hidden;$('#soundPop').hidden=h;$('#soundBtn').setAttribute('aria-expanded',String(!h))});
+
+/* ================= タブ（スマホ） ================= */
+const narrow=()=>matchMedia('(max-width: 899px)').matches;
+function goTab(t){
+  if(document.body.dataset.tab===t)return;
+  document.body.dataset.tab=t;
+  for(const b of document.querySelectorAll('.tabs button'))b.setAttribute('aria-selected',String(b.dataset.tab===t));
+  if(narrow())window.scrollTo({top:0,behavior:'instant'});
+}
+document.body.dataset.tab='forge';
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)goTab(b.dataset.tab)});
+function afterForge(){if(narrow())setTimeout(()=>goTab('arena'),1400)}
 
 /* ================= 剣の保管庫 ================= */
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2172,22 +2243,24 @@ async function bladeFromVault(v,role){
   if(v.hasVoice){const o=await IDB.get(v.id);if(o)b.voice=unpackVoice(o)}
   return b;
 }
-let playerVid=null;
+let playerVid=null,vaultOpen=null;
 function renderVault(){
-  $('#vaultCount').textContent=vault.length?`${vault.length}本`:'';
-  if(!vault.length){$('#vaultList').innerHTML='<p class="none">まだ剣がない。叫んで鍛えると、ここに残る。</p>';renderFoeSel();return}
+  $('#vaultCount').textContent=vault.length?`${vault.length}本`:'';$('#tabVaultN').textContent=vault.length?String(vault.length):'';
+  if(!vault.length){$('#vaultList').innerHTML='<p class="none">叫んで鍛えた剣が、ここに残る。</p>';renderFoeSel();return}
   $('#vaultList').innerHTML=vault.map(v=>{
     const b=makeBlade(v.name,JSON.parse(JSON.stringify(v.p)),0,''),tr=b.st.traits.map(k=>TRAITS[k].name),sh=shapeTags(b.shape).map(t=>t.name);
     const tag=v.from==='letter'?'<span class="tag">果たし状</span>':v.hasVoice?'':'<span class="tag">声なし</span>';
-    return `<div class="vault-item${v.id===playerVid?' on':''}" data-id="${v.id}"><div class="vn">「${esc(v.name)}」${tag}</div><div class="vb"><button data-act="use">使う</button><button data-act="foe">相手に</button><button data-act="letter">果たし状</button><button data-act="del">削除</button></div><div class="vm">${esc([typeName(b.segs),...tr,...sh].join(' ・ '))}</div></div>`;
+    const open=v.id===vaultOpen;
+    return `<div class="vault-item${v.id===playerVid?' on':''}" data-id="${v.id}"><button class="vrow" aria-expanded="${open}"><span class="vn">「${esc(v.name)}」${tag}</span><span class="use">${v.id===playerVid?'使用中':''}</span><span class="vm">${esc([typeName(b.segs),...tr,...sh].join(' ・ '))}</span></button><div class="vb"${open?'':' hidden'}><button class="pri" data-act="use">この剣を使う</button><button data-act="foe">相手にする</button><button data-act="letter">果たし状</button><button data-act="del">削除</button></div></div>`;
   }).join('');
   renderFoeSel();
 }
 $('#vaultList').addEventListener('click',async e=>{
   const bt=e.target.closest('button');if(!bt)return;const id=bt.closest('.vault-item').dataset.id,v=vault.find(x=>x.id===id);if(!v)return;
   const act=bt.dataset.act;
-  if(act==='use'){const b=await bladeFromVault(v);playerVid=v.id;setPlayerBlade(b,v.from==='letter'?'届いた剣':'保管庫の剣');renderVault()}
-  else if(act==='foe'){setMode('free');freeFoe='v:'+v.id;await applyFoe()}
+  if(bt.classList.contains('vrow')){vaultOpen=vaultOpen===id?null:id;renderVault();return}
+  if(act==='use'){const b=await bladeFromVault(v);playerVid=v.id;vaultOpen=null;setPlayerBlade(b,v.from==='letter'?'届いた剣':'保管庫の剣');renderVault();goTab('arena')}
+  else if(act==='foe'){setMode('free');freeFoe='v:'+v.id;vaultOpen=null;renderVault();await applyFoe();goTab('arena')}
   else if(act==='letter'){const b=makeBlade(v.name,JSON.parse(JSON.stringify(v.p)),0,'');showLetter(b)}
   else if(act==='del'){
     if(bt.dataset.sure!=='1'){bt.dataset.sure='1';bt.textContent='本当に削除';setTimeout(()=>{bt.dataset.sure='';bt.textContent='削除'},2500);return}
@@ -2229,7 +2302,7 @@ function receiveLetter(){
   const d=decodeSword(h.slice(2));if(!d)return false;
   const code=h.slice(2);let v=vault.find(x=>x.code===code);
   if(!v){const b=makeBlade(d.name,d.p,0,'');const id=vaultAdd(b,'letter',null);v=vault.find(x=>x.id===id);v.code=code;saveVault()}
-  setMode('free');freeFoe='v:'+v.id;applyFoe().then(()=>setBanner('果たし状が届いた！','go',`「${d.name}」の剣に挑め`));
+  setMode('free');freeFoe='v:'+v.id;goTab('arena');applyFoe().then(()=>setBanner('果たし状が届いた！','go',`「${d.name}」の剣に挑め`));
   try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
   return true;
 }
@@ -2274,9 +2347,10 @@ function renderForgeInfo(){
   const n=player.segs.length,longs=player.segs.filter(s=>s.long).length;
   $('#typeName').textContent=typeName(player.segs);
   const tags=shapeTags(player.shape);
-  $('#shapes').innerHTML=tags.length?tags.map(t=>`<span class="tag" title="${t.desc}"><b>${t.name}</b>${t.desc.split('。')[0]}</span>`).join(''):'<span class="none">形の特徴なし（語尾を上げ下げする・息継ぎする・声を震わせると形が変わる）</span>';
   const tr=player.st.traits;
-  $('#traits').innerHTML=tr.length?tr.map(k=>`<div class="trait"><b>異能・${TRAITS[k].name}</b><span>${TRAITS[k].desc}</span></div>`).join(''):'<div class="none">どれかの能力が80を超えると「異能」に目覚める</div>';
+  $('#chips').innerHTML=[...tr.map(k=>`<span class="chip tr" title="${TRAITS[k].desc}">異能・${TRAITS[k].name}</span>`),...tags.map(t=>`<span class="chip" title="${t.desc}">${t.name}</span>`)].join('');
+  $('#shapes').innerHTML=tags.length?tags.map(t=>`<span class="tag"><b>${t.name}</b>${t.desc}</span>`).join(''):'<span class="none">形の特徴なし。語尾を上げ下げする・3回以上区切る・声を震わせる・澄んだ声で叫ぶと、形が変わる。</span>';
+  $('#traits').innerHTML=tr.length?tr.map(k=>`<div class="trait"><b>異能・${TRAITS[k].name}</b><span>${TRAITS[k].desc}</span></div>`).join(''):'<div class="none">どれかの能力が80を超えると「異能」に目覚める。</div>';
   $('#typeHelp').textContent=longs&&longs===n?'伸ばした声は回転しながら薙ぎ払う。何度も当たるが一撃は軽い':longs?'伸ばした部分で薙ぎ払い、区切った部分で突く':n>1?'区切った声の数だけ鋭く突進する':'一声で一度、鋭く突進する';
   $('#cycleTag').textContent=`1周 ${cycleLen({b:player,speedMul:1}).toFixed(1)}秒`;
 }
@@ -2324,7 +2398,7 @@ function forgeFromAudio(audio,src){
   if(!p){showNote('声が小さすぎて剣になりませんでした。もっと大きく叫んでください。');return}
   const voice={buffer:audio,t0:p.t0,t1:p.t1};
   setPlayer($('#wordIn').value.trim()||'名無し',p,src,voice);
-  playerVid=vaultAdd(player,'self',voice);renderVault();
+  playerVid=vaultAdd(player,'self',voice);renderVault();afterForge();
 }
 $('#fileIn').addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;showNote('');
@@ -2336,7 +2410,7 @@ $('#sampleBtn').addEventListener('click',()=>{
   ac();
   const w=$('#wordIn').value.trim()||['うおおお','ラーメン','はっ！はっ！','ヤッホー'][Math.floor(Math.random()*4)];
   setPlayer(w,synthProfile(hashStr(w)^Math.floor(Math.random()*1e9)),'サンプルの剣');
-  playerVid=vaultAdd(player,'self',null);renderVault();
+  playerVid=vaultAdd(player,'self',null);renderVault();afterForge();
 });
 function updateShare(){
   const s=player.st.show;
