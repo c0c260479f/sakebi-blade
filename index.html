@@ -1332,7 +1332,7 @@ function synthProfile(seed,boost=0){
   }
   const mx=Math.max(...env);for(let i=0;i<N;i++)env[i]/=mx;
   const cv=r()<0.45?0:(r()*2-1),vb=r()<0.8?0:0.35+r()*0.65,cl=0.6+r()*0.4;
-  return{env,pitchHz:180+r()*900+boost*300,rough:clamp01(r()*0.6+boost*0.2),dur:kind>=4?0.6+r()*1.0:0.35+r()*1.3,peak:clamp01(0.45+r()*0.45+boost*0.1),curve:cv,vib:vb,clarity:cl};
+  return{env,pitchHz:120*Math.pow(800/120,r())*(1+boost*0.3),rough:clamp01(r()*0.6+boost*0.2),dur:kind>=4?0.6+r()*1.0:0.35+r()*1.3,peak:clamp01(0.45+r()*0.45+boost*0.1),curve:cv,vib:vb,clarity:cl};
 }
 /* 能力：威力・リーチ・速さ・重さ（どれかを上げると別のどれかが下がる） */
 const TRAITS={
@@ -1341,17 +1341,20 @@ const TRAITS={
   kaze:{name:'疾風',stat:'speed',desc:'二段突きでよくかわす。剛剣と長刀に強いが、不動に弱い'},
   fudo:{name:'不動',stat:'weight',desc:'吹き飛ばされず、軽い剣を場外へ叩き出す。剛剣に弱い'}
 };
+const PITCH_LO=110,PITCH_HI=900;
 function statsOf(p,bonus=0){
   const lenRaw=clamp01((p.dur-0.15)/1.6),mean=p.env.reduce((a,b)=>a+b,0)/p.env.length;
-  const weightRaw=clamp01(mean*0.9+p.peak*0.3-0.15);
-  const sharp=clamp01((Math.log2(Math.max(60,p.pitchHz))-Math.log2(150))/(Math.log2(3000)-Math.log2(150)));
+  // 人が叫べる高さ（およそ110〜900Hz）を、鋭さ0〜1に割り振る
+  const sharp=clamp01((Math.log2(Math.max(60,p.pitchHz))-Math.log2(PITCH_LO))/(Math.log2(PITCH_HI)-Math.log2(PITCH_LO)));
+  // 重さ：声が詰まっているほど、大きいほど、低いほど重い
+  const weightRaw=clamp01(mean*0.75+p.peak*0.3+0.3*(1-sharp)-0.3);
   const rough=p.rough;
   const powerRaw=clamp01(0.5*p.peak+0.2*weightRaw+0.3*rough);
   const speedRaw=clamp01((1-weightRaw*0.7)*(0.45+0.55*sharp));
   // 中央付近に固まらないよう、ばらつきを広げる
   const sp=(v,m,g)=>clamp01(0.5+(v-m)*g);
   const b=1+bonus;
-  const power=clamp01(sp(powerRaw,.54,3.2)*b),speed=clamp01(sp(speedRaw,.44,2.6)*b),len=sp(lenRaw,.57,1.33),weight=sp(weightRaw,.55,1.9);
+  const power=clamp01(sp(powerRaw,.52,3.2)*b),speed=clamp01(sp(speedRaw,.49,2.6)*b),len=sp(lenRaw,.57,1.33),weight=sp(weightRaw,.47,1.9);
   const n=v=>Math.round(clamp(v*99,1,99));
   const show={power:n(power),reach:n(len),speed:n(speed),weight:n(weight)};
   const traits=Object.keys(TRAITS).filter(k=>show[TRAITS[k].stat]>=80);
@@ -1926,7 +1929,7 @@ function tryHit(A,B){
   const rB=-B.gripLen*0.8+c.t*(B.reach+B.gripLen*0.8),hilt=A.breaks>0&&A.hp<B.hp&&rB<0;
   // 軽い剣は、構えていない時に身をかわすことがある
   const canDodge=!st.has('fudo')&&!st.has('naga');
-  if(canDodge&&!B.curSeg&&B.cool<=0&&Math.random()<0.5*B.b.st.speed*B.speedMul-0.12+(B.b.st.has('kaze')?0.06:0)+(st.has('gou')?0.2:0)){
+  if(canDodge&&!B.curSeg&&B.cool<=0&&Math.random()<0.5*B.b.st.speed*B.speedMul-0.12+(B.b.st.has('kaze')?0.06:0)+(st.has('gou')?0.3:0)){
     const px=-Math.sin(A.h),pz=Math.cos(A.h),sd=(px*B.x+pz*B.z)>0?-1:1,dv=380+300*B.b.st.speed;
     B.vx+=px*sd*dv;B.vz+=pz*sd*dv;B.cool=0.25;A.hitDone=true;if(A.curSeg.long)A.tickCd=0.3;
     popup('回避',B.x,84,B.z,'w');if(AV)arena.sparks.emit(B.x,40,B.z,14,B.o?B.o.accent.clone().multiplyScalar(1.6):new THREE.Color(1,1,1),200,30);
@@ -2029,9 +2032,9 @@ function mkEnv(parts,N=40){
 }
 const DOJO=[
  {word:'えいっ',title:'門下生',say:'えいっ',vox:{f0:310,size:1.28,breath:0.2,growl:0,vib:0,fall:0.1},hint:'短い一突きだけの、まだ未熟な剣。どんな叫びでも勝てるはず。',bonus:-0.1,
-  p:{env:mkEnv([[0,0.3,1,'fall'],[0.3,1,0.25,'fall']]),dur:0.5,pitchHz:330,peak:0.45,rough:0.15,clarity:0.85,curve:0,vib:0}},
+  p:{env:mkEnv([[0,0.3,1,'fall'],[0.3,1,0.25,'fall']]),dur:0.5,pitchHz:230,peak:0.45,rough:0.15,clarity:0.85,curve:0,vib:0}},
  {word:'やあっ、たあっ',title:'見習い',say:'やあっ、たあっ',vox:{f0:250,size:1.15,breath:0.15,growl:0.05,vib:0,fall:0.12},hint:'二連突き。手数で押してくる。',bonus:-0.05,
-  p:{env:mkEnv([[0,0.22,1,'fall'],[0.22,0.45,0.25],[0.55,0.78,0.95,'fall'],[0.78,1,0.25]]),dur:0.8,pitchHz:380,peak:0.55,rough:0.2,clarity:0.85,curve:0,vib:0}},
+  p:{env:mkEnv([[0,0.22,1,'fall'],[0.22,0.45,0.25],[0.55,0.78,0.95,'fall'],[0.78,1,0.25]]),dur:0.8,pitchHz:260,peak:0.55,rough:0.2,clarity:0.85,curve:0,vib:0}},
  {word:'うおおおおおお',title:'長刀使い',say:'うおおおおおお',vox:{f0:135,size:0.95,breath:0.12,growl:0.15,vib:0.1,fall:0.18},hint:'長刀。遠くから薙ぎ払う。重い剣で押し切れ。',bonus:0.06,
   p:{env:mkEnv([[0,1,0.75,'arch']]),dur:1.85,pitchHz:300,peak:0.6,rough:0.1,clarity:0.85,curve:0.4,vib:0}},
  {word:'あ゛あ゛あ゛あ゛',title:'波刃の亡霊',say:'あ゛あ゛あ゛あ゛',vox:{f0:175,size:1.05,breath:0.75,growl:0.55,vib:0.9,fall:-0.1},hint:'波刃。斬られた傷がしばらく痛む。速い剣で短期決戦を。',bonus:0.08,
@@ -2043,9 +2046,9 @@ const DOJO=[
  {word:'ひゅっ',title:'風使い',say:'ひゅっ、ひゅっ',vox:{f0:400,size:1.32,breath:0.7,growl:0,vib:0,fall:0.05},hint:'疾風。速くてよくかわす。重い不動の剣で場外へ叩き出せ。',bonus:0.02,
   p:{env:mkEnv([[0,0.25,0.9,'fall'],[0.25,0.45,0.2],[0.55,0.8,0.85,'fall'],[0.8,1,0.2]]),dur:0.5,pitchHz:1500,peak:0.55,rough:0.15,clarity:0.88,curve:0,vib:0}},
  {word:'いざ、参る',title:'師範代',say:'いざ、まいる',vox:{f0:150,size:0.93,breath:0.08,growl:0.05,vib:0.15,fall:0.1},hint:'反った片刃の刀。会心が出やすく、隙がない。',bonus:0.18,
-  p:{env:mkEnv([[0,0.25,0.85,'fall'],[0.25,0.38,0.2],[0.42,1,0.9,'arch']]),dur:1.25,pitchHz:620,peak:0.75,rough:0.2,clarity:0.97,curve:0.9,vib:0}},
+  p:{env:mkEnv([[0,0.25,0.85,'fall'],[0.25,0.38,0.2],[0.42,1,0.9,'arch']]),dur:1.25,pitchHz:330,peak:0.75,rough:0.2,clarity:0.97,curve:0.9,vib:0}},
  {word:'はっ！はっ！はっ！',title:'三段突き',say:'はっ！はっ！はっ！',vox:{f0:215,size:1.02,breath:0.25,growl:0.2,vib:0,fall:0.05},hint:'枝刃の三連突き。刃を絡め取ってくる。疾風なら捌ける。',bonus:0.08,
-  p:{env:mkEnv([[0,0.22,1,'fall'],[0.38,0.6,1,'fall'],[0.76,0.98,1,'fall']]),dur:1.0,pitchHz:420,peak:0.75,rough:0.35,clarity:0.85,curve:0,vib:0}},
+  p:{env:mkEnv([[0,0.22,1,'fall'],[0.38,0.6,1,'fall'],[0.76,0.98,1,'fall']]),dur:1.0,pitchHz:290,peak:0.75,rough:0.35,clarity:0.85,curve:0,vib:0}},
  {word:'喝ッ！！',title:'道場主',say:'かあーっ',vox:{f0:82,size:0.7,breath:0.2,growl:0.85,vib:0,fall:0.2},hint:'剛剣と不動をあわせ持つ。剛剣か疾風でなければ歯が立たない。',bonus:0.2,
   p:{env:mkEnv([[0,0.7,1,'flat'],[0.7,1,0.9,'fall']]),dur:1.1,pitchHz:190,peak:1,rough:0.7,clarity:0.8,curve:0.6,vib:0}}
 ];
