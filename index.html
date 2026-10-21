@@ -1272,15 +1272,21 @@ function analyze(data,sr){
     rms.push(Math.sqrt(s/frame));zcr.push(z/frame*sr/2);
   }
   const mx=Math.max(1e-6,...rms);
-  if(mx<0.008)return null;
+  // マイクの感度に左右されないよう、「叫び」と「周りの静けさ」の差で大きさを測る
+  const db=v=>20*Math.log10(Math.max(1e-7,v)),sorted=[...rms].sort((x,y)=>x-y);
+  const floorDb=Math.min(db(sorted[Math.floor(sorted.length*0.1)]),-38),snr=db(mx)-floorDb;
+  if(snr<12||mx<0.0015)return null;
   const thr=mx*0.12,a=rms.findIndex(r=>r>thr);
   let b=rms.length-1;while(b>a&&rms[b]<=thr)b--;
   const seg=rms.slice(a,b+1),zs=zcr.slice(a,b+1),N=40,env=[];
   for(let i=0;i<N;i++){const k=Math.min(seg.length-1,Math.floor(i/N*seg.length));env.push(seg[k]/mx)}
   let wz=0,ws=0;seg.forEach((r,i)=>{wz+=zs[i]*r;ws+=r});
   let d=0;for(let i=1;i<seg.length;i++)d+=Math.abs(seg[i]-seg[i-1])/mx;
+  // 立ち上がりの鋭さ（40msでどれだけ一気に大きくなったか）
+  let attack=0;for(let i=2;i<seg.length;i++)attack=Math.max(attack,(seg[i]-seg[i-2])/mx);
+  const loud=clamp01((snr-18)/32),roughRaw=clamp01(d/Math.max(1,seg.length)*4);
   const pc=pitchContour(data,sr,frame,a,b,rms,thr);
-  return{env,pitchHz:pc.median||wz/ws,rough:clamp01(d/Math.max(1,seg.length)*4),dur:seg.length*frame/sr,peak:Math.min(1,peak),t0:a*frame/sr,t1:(b+1)*frame/sr,curve:pc.curve,vib:pc.vib,semis:pc.semis,vibRate:pc.rate,clarity:pc.clarity};
+  return{env,pitchHz:pc.median||wz/ws,rough:clamp01(Math.max(roughRaw*1.5,(attack-0.35)*0.9)),dur:seg.length*frame/sr,peak:loud,peakRaw:Math.min(1,peak),snr,attack,t0:a*frame/sr,t1:(b+1)*frame/sr,curve:pc.curve,vib:pc.vib,semis:pc.semis,vibRate:pc.rate,clarity:pc.clarity};
 }
 function pitchContour(data,sr,frame,a,b,rms,thr){
   // 1フレームごとに自己相関で声の高さを推定する（半分に間引いて計算を軽くする）
@@ -1425,7 +1431,18 @@ function shapeTags(sh){
   if(sh.vib)t.push({k:'nami',name:'波刃',desc:'声の揺れが波打つ刃になる。斬った傷がしばらく痛む'});
   return t;
 }
+// 果たし状と同じ精度に揃える（送った剣と届いた剣を完全に同じにするため）
+function qProfile(p){
+  const q8=v=>Math.round(clamp(v,0,1)*255)/255,q16=v=>Math.round(clamp(v,0,1)*65535)/65535;
+  const o={...p};
+  o.dur=q16(p.dur/6)*6;o.pitchHz=60*Math.pow(50,q16(Math.log2(clamp(p.pitchHz,60,3000)/60)/Math.log2(50)));
+  o.peak=q8(p.peak);o.rough=q8(p.rough);o.clarity=q8(p.clarity??0.85);o.vib=q8(p.vib||0);
+  const c=q8(((p.curve||0)+1)/2)*2-1;o.curve=Math.abs(c)<0.02?0:c;
+  o.env=Array.from({length:40},(_,i)=>q8(p.env[i]??0));
+  return o;
+}
 function makeBlade(name,p,bonus,seedExtra,voice=null){
+  p=qProfile(p);
   const st=statsOf(p,bonus);
   const segs=rhythmOf(p.env);return{name,p,st,voice,segs,shape:buildShape(p,st,hashStr(name+seedExtra),segs)};
 }
@@ -2220,7 +2237,7 @@ const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 let vault=[];try{vault=JSON.parse(localStorage.getItem('sakebi_vault')||'[]')}catch(e){vault=[]}
 const VAULT_MAX=24;
 function saveVault(){try{localStorage.setItem('sakebi_vault',JSON.stringify(vault))}catch(e){}}
-function slimP(p){const o={};for(const k of ['dur','pitchHz','peak','rough','clarity','curve','vib','semis'])if(p[k]!=null)o[k]=+(+p[k]).toFixed(4);o.env=p.env.map(v=>+v.toFixed(3));return o}
+function slimP(p){const o={};for(const k of ['dur','pitchHz','peak','rough','clarity','curve','vib','semis','snr'])if(p[k]!=null)o[k]=+(+p[k]).toFixed(7);o.env=p.env.map(v=>+v.toFixed(6));return o}
 // 録音はIndexedDBへ（端末の中だけ）
 const IDB={db:null,open(){if(this.db)return Promise.resolve(this.db);return new Promise(res=>{try{const r=indexedDB.open('sakebi',1);r.onupgradeneeded=()=>r.result.createObjectStore('voices');r.onsuccess=()=>{this.db=r.result;res(this.db)};r.onerror=()=>res(null)}catch(e){res(null)}})},
   async op(mode,fn){const db=await this.open();if(!db)return null;return new Promise(res=>{try{const tx=db.transaction('voices',mode),st=tx.objectStore('voices'),q=fn(st);q.onsuccess=()=>res(q.result??null);q.onerror=()=>res(null)}catch(e){res(null)}})},
@@ -2274,18 +2291,22 @@ $('#vaultList').addEventListener('click',async e=>{
 function b64u(bytes){let s='';for(const c of bytes)s+=String.fromCharCode(c);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function unb64u(t){const s=atob(t.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((t.length+3)%4));return Uint8Array.from(s,c=>c.charCodeAt(0))}
 function encodeSword(b){
-  const p=b.p,u8=v=>clamp(Math.round(v*255),0,255);
-  let nb=new TextEncoder().encode(b.name);while(nb.length>30){b=Object.assign({},b,{name:[...b.name].slice(0,-1).join('')});nb=new TextEncoder().encode(b.name)}
-  const out=[1,nb.length,...nb,u8(p.dur/5),u8(Math.log2(clamp(p.pitchHz,60,3000)/60)/Math.log2(50)),u8(p.peak),u8(p.rough),u8(p.clarity??0.85),u8(((p.curve||0)+1)/2),u8(p.vib||0)];
-  for(let i=0;i<40;i+=2)out.push((Math.round(clamp(p.env[i],0,1)*15)<<4)|Math.round(clamp(p.env[i+1]??0,0,1)*15));
+  // 第2版：長さと高さは2バイト、音量の推移は1点1バイトで、能力がずれないようにする
+  const p=b.p,u8=v=>clamp(Math.round(v*255),0,255),u16=v=>{const x=clamp(Math.round(v*65535),0,65535);return[x>>8,x&255]};
+  let name=b.name,nb=new TextEncoder().encode(name);while(nb.length>30){name=[...name].slice(0,-1).join('');nb=new TextEncoder().encode(name)}
+  const out=[2,nb.length,...nb,...u16(p.dur/6),...u16(Math.log2(clamp(p.pitchHz,60,3000)/60)/Math.log2(50)),u8(p.peak),u8(p.rough),u8(p.clarity??0.85),u8(((p.curve||0)+1)/2),u8(p.vib||0)];
+  for(let i=0;i<40;i++)out.push(u8(clamp(p.env[i]??0,0,1)));
   return b64u(out);
 }
 function decodeSword(code){
   try{
-    const x=unb64u(code);if(x[0]!==1)return null;let k=1;const nl=x[k++],name=new TextDecoder().decode(x.slice(k,k+nl));k+=nl;
-    const f=()=>x[k++]/255,dur=f()*5,pitchHz=60*Math.pow(50,f()),peak=f(),rough=f(),clarity=f(),curve=f()*2-1,vib=f();
-    const env=[];for(let i=0;i<20;i++){const v=x[k++];env.push((v>>4)/15,(v&15)/15)}
-    if(env.length!==40||!isFinite(dur)||dur<=0)return null;
+    const x=unb64u(code),ver=x[0];if(ver!==1&&ver!==2)return null;let k=1;const nl=x[k++],name=new TextDecoder().decode(x.slice(k,k+nl));k+=nl;
+    const f=()=>x[k++]/255,g=()=>{const v=(x[k]<<8|x[k+1])/65535;k+=2;return v};
+    const dur=ver===2?g()*6:f()*5,pitchHz=60*Math.pow(50,ver===2?g():f()),peak=f(),rough=f(),clarity=f(),curve=f()*2-1,vib=f();
+    const env=[];
+    if(ver===2)for(let i=0;i<40;i++)env.push(x[k++]/255);
+    else for(let i=0;i<20;i++){const v=x[k++];env.push((v>>4)/15,(v&15)/15)}
+    if(env.length!==40||env.some(v=>!isFinite(v))||!isFinite(dur)||dur<=0)return null;
     return{name:name||'名無し',p:{env,dur,pitchHz,peak,rough,clarity,curve:Math.abs(curve)<0.02?0:curve,vib}};
   }catch(e){return null}
 }
@@ -2343,7 +2364,7 @@ const STAT_LABELS=[['power','威力'],['reach','リーチ'],['speed','速さ'],[
 function renderForgeInfo(){
   $('#swordName').textContent=`「${player.name}」の剣`;
   const sm=player.p.semis;
-  $('#readout').textContent=`${player.p.dur.toFixed(2)}秒 · 高さ ${Math.round(player.p.pitchHz)}Hz${sm?` (${sm>0?'+':''}${sm.toFixed(1)}半音)`:''} · 最大音量 ${Math.round(player.p.peak*100)}% · 荒さ ${Math.round(player.p.rough*100)}%`;
+  $('#readout').textContent=`${player.p.dur.toFixed(2)}秒 · 高さ ${Math.round(player.p.pitchHz)}Hz${sm?` (${sm>0?'+':''}${sm.toFixed(1)}半音)`:''} · 声の大きさ ${player.p.snr!=null?Math.round(player.p.snr)+'dB':Math.round(player.p.peak*100)+'%'} · 荒さ ${Math.round(player.p.rough*100)}%`;
   $('#stats').innerHTML=STAT_LABELS.map(([k,l])=>`<div class="stat${player.st.show[k]>=80?' hi':''}"><b>${l}</b><div class="bar"><i style="width:${player.st.show[k]}%"></i></div><span>${player.st.show[k]}</span></div>`).join('');
   $('#strip').innerHTML=player.segs.map(s=>`<i class="${s.long?'long':''}" style="left:${s.u0*100}%;width:${(s.u1-s.u0)*100}%;opacity:${0.45+0.55*s.pk}"></i>`).join('');
   const n=player.segs.length,longs=player.segs.filter(s=>s.long).length;
