@@ -1351,18 +1351,107 @@ function playVoice(f,seg,realDur){
     const g=AC.createGain();g.gain.value=1.0;src.connect(g);g.connect(f.pan);src.start(now,s,len);
     return;
   }
-  // 録音がない剣は、声っぽい合成音で叫ぶ
-  const env=f.b.p.env.slice(seg.s,Math.max(seg.e,seg.s+2)),vals=new Float32Array(env.length+2);
-  vals[0]=0;env.forEach((e,i)=>vals[i+1]=e*0.32);vals[vals.length-1]=0;
-  const f0=clamp(f.b.p.pitchHz*0.45,95,520);
-  const o=AC.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(f0,now);o.frequency.linearRampToValueAtTime(f0*(0.85+Math.random()*0.35),now+realDur);
-  const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=5.5;lg.gain.value=f0*0.04;lfo.connect(lg);lg.connect(o.frequency);
-  const bp=AC.createBiquadFilter();bp.type='bandpass';bp.frequency.value=f.b.p.pitchHz>500?1400:800;bp.Q.value=1.1;
-  const bp2=AC.createBiquadFilter();bp2.type='bandpass';bp2.frequency.value=2600;bp2.Q.value=2;
-  const g=AC.createGain();g.gain.setValueCurveAtTime(vals,now,Math.max(0.06,realDur));
-  o.connect(bp);o.connect(bp2);bp.connect(g);bp2.connect(g);g.connect(f.pan);
-  o.start(now);lfo.start(now);o.stop(now+realDur+0.05);lfo.stop(now+realDur+0.05);
+  // 録音がない剣は、その剣士の声で言葉を叫ぶ
+  const b=f.b,idx=Math.max(0,b.segs.indexOf(seg));
+  shout(AC,f.pan,now+0.005,moraFor(b,idx,b.segs.length),clamp(realDur,0.14,2.4),voiceOf(b),{gain:0.55*(0.75+0.35*seg.pk),semi:(Math.random()-0.5)*2.2});
 }
+/* ================= 合成音声：仮名を、その剣士の声で叫ぶ ================= */
+const KANA_ROWS={'':'あいうえお',k:'かきくけこ',g:'がぎぐげご',s:'さしすせそ',z:'ざじずぜぞ',t:'たちつてと',d:'だぢづでど',n:'なにぬねの',h:'はひふへほ',b:'ばびぶべぼ',p:'ぱぴぷぺぽ',m:'まみむめも',y:'や-ゆ-よ',r:'らりるれろ',w:'わ---を'};
+const KANA={};
+for(const [c,row] of Object.entries(KANA_ROWS))[...row].forEach((ch,i)=>{if(ch!=='-')KANA[ch]={c,v:'aiueo'[i]}});
+Object.assign(KANA,{'し':{c:'sh',v:'i'},'ち':{c:'ch',v:'i'},'つ':{c:'ts',v:'u'},'ふ':{c:'f',v:'u'},'じ':{c:'j',v:'i'},'ぢ':{c:'j',v:'i'},'づ':{c:'z',v:'u'},'ん':{c:'N',v:'n'},'ゔ':{c:'b',v:'u'}});
+const SMALL={'ぁ':'a','ぃ':'i','ぅ':'u','ぇ':'e','ぉ':'o','ゃ':'a','ゅ':'u','ょ':'o'};
+function toHira(s){return[...s].map(ch=>{const c=ch.codePointAt(0);return c>=0x30a1&&c<=0x30f6?String.fromCodePoint(c-0x60):ch}).join('')}
+function parseMora(text){
+  const out=[];let gem=false;
+  for(const ch of toHira(text||'')){
+    const last=out[out.length-1];
+    if(ch==='ー'||ch==='〜'||ch==='~'){if(last)out.push({c:'',v:last.v,ext:true});continue}
+    if(ch==='っ'){gem=true;if(last)last.stop=true;continue}
+    if(ch==='゛'||ch==='゙'){if(last)last.growl=true;continue}
+    if(ch==='！'||ch==='!'){if(last)last.emph=true;continue}
+    if(ch==='、'||ch===','||ch==='　'||ch===' '||ch==='…'){if(last)last.pause=true;continue}
+    if(SMALL[ch]&&last){if('ゃゅょ'.includes(ch)){last.y=true}last.v=SMALL[ch];continue}
+    const k=KANA[ch];if(!k)continue;
+    out.push({c:k.c,v:k.v,gem});gem=false;
+  }
+  return out;
+}
+// 母音ごとの響き（日本語の成人男性の目安、Hz）
+const FORM={a:[800,1250,2600],i:[300,2250,3000],u:[350,1350,2400],e:[500,1900,2600],o:[500,850,2500],n:[280,1500,2600]};
+function voiceOf(b){
+  if(b.vox)return b.vox;
+  const p=b.p,f0=clamp(p.pitchHz*0.45,85,480);
+  return{f0,size:clamp(1.45-f0/400*0.6-b.st.weight*0.3,0.72,1.35),breath:clamp(0.15+(1-(p.clarity??0.85))*1.2,0.05,0.8),growl:clamp(p.rough*0.8,0,0.8),vib:p.vib||0,fall:0.12};
+}
+function fallbackMora(name){const r=rng(hashStr(name||'x'));return Array.from({length:3},()=>({c:['','k','t','h','d','r'][Math.floor(r()*6)],v:'aoaeiu'[Math.floor(r()*6)]}))}
+let NOISE_LONG=null;
+function shout(ctx,dest,t0,mora,dur,vox,o={}){
+  if(!mora.length)return;
+  if(!NOISE_LONG||NOISE_LONG.sampleRate!==ctx.sampleRate){NOISE_LONG=ctx.createBuffer(1,ctx.sampleRate*3,ctx.sampleRate);const d=NOISE_LONG.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+  const amp=(o.gain??0.5)*(1+clamp((150-vox.f0)/150,0,0.55)),f0=vox.f0*Math.pow(2,(o.semi||0)/12),sz=vox.size,end=t0+dur+0.08;
+  // 音源：のこぎり波＋（だみ声なら）低い副音
+  const osc=ctx.createOscillator();osc.type='sawtooth';osc.frequency.setValueAtTime(f0*1.06,t0);
+  const sub=ctx.createOscillator();sub.type='square';sub.frequency.setValueAtTime(f0/2,t0);
+  const subG=ctx.createGain();subG.gain.value=vox.growl*0.35;
+  const src=ctx.createGain();src.gain.value=1;osc.connect(src);sub.connect(subG);subG.connect(src);
+  const vibL=ctx.createOscillator(),vibG=ctx.createGain();vibL.frequency.value=5.2+Math.random();vibG.gain.value=f0*(0.008+vox.vib*0.05);vibL.connect(vibG);vibG.connect(osc.frequency);
+  // 息の雑音（母音の響きにも通す）
+  const nz=ctx.createBufferSource();nz.buffer=NOISE_LONG;nz.loop=true;
+  const nzV=ctx.createGain();nzV.gain.value=vox.breath*0.9;nz.connect(nzV);
+  // 3つの響き（並列）
+  const vg=ctx.createGain();vg.gain.setValueAtTime(0,t0);
+  const fl=[0,1,2].map(i=>{const f=ctx.createBiquadFilter();f.type='bandpass';f.Q.value=[6,9,11][i];const g=ctx.createGain();g.gain.value=[1,0.62,0.3][i]*(i===0?1.4:2.2);src.connect(f);nzV.connect(f);f.connect(g);g.connect(vg);return f});
+  // だみ声：細かく震える音量
+  const out=ctx.createGain();out.gain.value=amp;
+  if(vox.growl>0.05){const am=ctx.createOscillator(),amG=ctx.createGain(),dc=ctx.createGain();am.frequency.value=32+vox.growl*30;amG.gain.value=vox.growl*0.45;dc.gain.value=1-vox.growl*0.2;vg.connect(dc);am.connect(amG);amG.connect(dc.gain);dc.connect(out);am.start(t0);am.stop(end)}
+  else vg.connect(out);
+  out.connect(dest);
+  // 子音用の雑音
+  const cn=ctx.createBufferSource();cn.buffer=NOISE_LONG;cn.loop=true;
+  const cf=ctx.createBiquadFilter();cf.type='bandpass';cf.Q.value=1.2;const cg=ctx.createGain();cg.gain.setValueAtTime(0,t0);cn.connect(cf);cf.connect(cg);cg.connect(out);
+  // 時間割り
+  const weights=mora.map(m=>(m.ext?0.9:1)+(m.pause?0.5:0)+(m.gem?0.35:0));const W=weights.reduce((a,b)=>a+b,0);
+  let t=t0;const fall=vox.fall+(o.fall||0);
+  mora.forEach((m,i)=>{
+    const md=dur*weights[i]/W,gemGap=m.gem?Math.min(0.07,md*0.25):0,pauseGap=m.pause?md*0.3:0;
+    const cons=m.c,stop=['k','t','p','ch','ts'].includes(cons),fric=['s','sh','h','f','z','j'].includes(cons),voicedStop=['g','d','b'].includes(cons),nas=['n','m','N'].includes(cons);
+    let tv=t+gemGap+(stop?0.035:fric?0.07:voicedStop?0.025:nas?0.045:cons==='r'?0.02:0.005);
+    tv=Math.min(tv,t+md*0.5);
+    const lvl=(m.emph?1.25:1)*(m.ext?0.9:1)*(i===0?1.08:1);
+    const vEnd=t+md-pauseGap;
+    // 子音
+    if(stop||fric||voicedStop){
+      const fr={k:1900,t:4200,p:900,ch:3300,ts:4800,s:5600,sh:3000,h:1600,f:1300,z:4800,j:2800,g:1700,d:3600,b:800}[cons]||2500;
+      cf.frequency.setValueAtTime(fr*(sz>1?1.1:1),t+gemGap);
+      const a=stop||voicedStop?0.9:0.55,len=stop?0.03:fric?0.075:0.02;
+      cg.gain.setValueAtTime(0,t+gemGap);cg.gain.linearRampToValueAtTime(a*(voicedStop?0.5:1),t+gemGap+0.006);cg.gain.setTargetAtTime(0,t+gemGap+len*0.6,len*0.3);
+    }
+    // 響きの切り替え
+    const F=FORM[m.v]||FORM.a,F0=m.y?FORM.i:cons==='w'?FORM.u:null;
+    fl.forEach((f,k)=>{if(F0){f.frequency.setValueAtTime(F0[k]*sz,tv);f.frequency.linearRampToValueAtTime(F[k]*sz,tv+0.06)}else f.frequency.setTargetAtTime(F[k]*sz,tv-0.01,0.018)});
+    if(nas)fl.forEach((f,k)=>{f.frequency.setValueAtTime(FORM.n[k]*sz,t+gemGap)});
+    // 声の高さ：叫びは頭が高く、だんだん下がる
+    const prog=i/Math.max(1,mora.length-1),st=-fall*12*prog+(m.emph?1.5:0)+(o.glide||0)*prog;
+    osc.frequency.setTargetAtTime(f0*Math.pow(2,st/12),tv,0.03);sub.frequency.setTargetAtTime(f0/2*Math.pow(2,st/12),tv,0.03);
+    // 音量
+    vg.gain.setTargetAtTime(nas?0.25*lvl:0.02,t+gemGap,0.008);
+    vg.gain.setTargetAtTime(lvl,tv,cons==='r'?0.006:0.012);
+    if(m.stop||m.pause||i===mora.length-1)vg.gain.setTargetAtTime(0,vEnd-(m.stop?0.012:0.04),m.stop?0.006:0.03);
+    else vg.gain.setTargetAtTime(lvl*0.82,vEnd-0.02,0.02);
+    t+=md;
+  });
+  for(const n of [osc,sub,vibL,nz,cn])n.start(t0);
+  for(const n of [osc,sub,vibL,nz,cn])n.stop(end);
+}
+// 斬撃の区切りに、言葉を割り当てる
+function moraFor(b,segIndex,segCount){
+  const all=b.mora||(b.mora=(()=>{const m=parseMora(b.say||b.name);return m.length?m:fallbackMora(b.name)})());
+  if(segCount<=1)return all;
+  const per=Math.max(1,Math.round(all.length/segCount)),a=(segIndex*per)%all.length;
+  return all.slice(a,Math.min(all.length,a+per+(segIndex===segCount-1?all.length:0)));
+}
+
 function sfx(kind,pan=0,k=1){
   if(muted||!AC)return;
   const now=AC.currentTime,p=panNode();if(p.pan)p.pan.value=clamp(pan,-1,1);
@@ -1820,30 +1909,30 @@ function mkEnv(parts,N=40){
   return e;
 }
 const DOJO=[
- {word:'えいっ',title:'門下生',hint:'短い一突きだけの、まだ未熟な剣。どんな叫びでも勝てるはず。',bonus:-0.1,
+ {word:'えいっ',title:'門下生',say:'えいっ',vox:{f0:310,size:1.28,breath:0.2,growl:0,vib:0,fall:0.1},hint:'短い一突きだけの、まだ未熟な剣。どんな叫びでも勝てるはず。',bonus:-0.1,
   p:{env:mkEnv([[0,0.3,1,'fall'],[0.3,1,0.25,'fall']]),dur:0.5,pitchHz:330,peak:0.45,rough:0.15,clarity:0.85,curve:0,vib:0}},
- {word:'やあっ、たあっ',title:'見習い',hint:'二連突き。手数で押してくる。',bonus:-0.05,
+ {word:'やあっ、たあっ',title:'見習い',say:'やあっ、たあっ',vox:{f0:250,size:1.15,breath:0.15,growl:0.05,vib:0,fall:0.12},hint:'二連突き。手数で押してくる。',bonus:-0.05,
   p:{env:mkEnv([[0,0.22,1,'fall'],[0.22,0.45,0.25],[0.55,0.78,0.95,'fall'],[0.78,1,0.25]]),dur:0.8,pitchHz:380,peak:0.55,rough:0.2,clarity:0.85,curve:0,vib:0}},
- {word:'うおおおおおお',title:'長刀使い',hint:'長刀。遠くから薙ぎ払う。重い剣で押し切れ。',bonus:0.06,
+ {word:'うおおおおおお',title:'長刀使い',say:'うおおおおおお',vox:{f0:135,size:0.95,breath:0.12,growl:0.15,vib:0.1,fall:0.18},hint:'長刀。遠くから薙ぎ払う。重い剣で押し切れ。',bonus:0.06,
   p:{env:mkEnv([[0,1,0.75,'arch']]),dur:1.85,pitchHz:300,peak:0.6,rough:0.1,clarity:0.85,curve:0.4,vib:0}},
- {word:'あ゛あ゛あ゛あ゛',title:'波刃の亡霊',hint:'波刃。斬られた傷がしばらく痛む。速い剣で短期決戦を。',bonus:0.08,
+ {word:'あ゛あ゛あ゛あ゛',title:'波刃の亡霊',say:'あ゛あ゛あ゛あ゛',vox:{f0:175,size:1.05,breath:0.75,growl:0.55,vib:0.9,fall:-0.1},hint:'波刃。斬られた傷がしばらく痛む。速い剣で短期決戦を。',bonus:0.08,
   p:{env:mkEnv([[0,1,0.85,'arch']]),dur:1.3,pitchHz:260,peak:0.6,rough:0.25,clarity:0.7,curve:-0.3,vib:0.9}},
- {word:'どすこーい',title:'力士',hint:'不動。ほとんど吹き飛ばない。威力の高い剛剣でへし折れ。',bonus:-0.06,
+ {word:'どすこーい',title:'力士',say:'どすこーい',vox:{f0:92,size:0.76,breath:0.1,growl:0.3,vib:0,fall:0.08},hint:'不動。ほとんど吹き飛ばない。威力の高い剛剣でへし折れ。',bonus:-0.06,
   p:{env:mkEnv([[0,0.3,1],[0.3,1,0.95,'arch']]),dur:0.9,pitchHz:150,peak:0.7,rough:0.08,clarity:0.8,curve:-0.5,vib:0}},
- {word:'ちぇすとおっ',title:'剛剣',hint:'剛剣。一撃で刃をへし折る。大振りなので、疾風ならかわせる。',bonus:0.1,
+ {word:'ちぇすとおっ',title:'剛剣',say:'ちぇすとおっ',vox:{f0:118,size:0.86,breath:0.18,growl:0.65,vib:0,fall:0.15},hint:'剛剣。一撃で刃をへし折る。大振りなので、疾風ならかわせる。',bonus:0.1,
   p:{env:mkEnv([[0,0.3,1,'fall'],[0.3,0.55,0.3],[0.62,0.9,1,'fall'],[0.9,1,0.2]]),dur:0.8,pitchHz:280,peak:1,rough:0.65,clarity:0.75,curve:0.3,vib:0}},
- {word:'ひゅっ',title:'風使い',hint:'疾風。速くてよくかわす。重い不動の剣で場外へ叩き出せ。',bonus:0.02,
+ {word:'ひゅっ',title:'風使い',say:'ひゅっ、ひゅっ',vox:{f0:400,size:1.32,breath:0.7,growl:0,vib:0,fall:0.05},hint:'疾風。速くてよくかわす。重い不動の剣で場外へ叩き出せ。',bonus:0.02,
   p:{env:mkEnv([[0,0.25,0.9,'fall'],[0.25,0.45,0.2],[0.55,0.8,0.85,'fall'],[0.8,1,0.2]]),dur:0.5,pitchHz:1500,peak:0.55,rough:0.15,clarity:0.88,curve:0,vib:0}},
- {word:'いざ、参る',title:'師範代',hint:'反った片刃の刀。会心が出やすく、隙がない。',bonus:0.18,
+ {word:'いざ、参る',title:'師範代',say:'いざ、まいる',vox:{f0:150,size:0.93,breath:0.08,growl:0.05,vib:0.15,fall:0.1},hint:'反った片刃の刀。会心が出やすく、隙がない。',bonus:0.18,
   p:{env:mkEnv([[0,0.25,0.85,'fall'],[0.25,0.38,0.2],[0.42,1,0.9,'arch']]),dur:1.25,pitchHz:620,peak:0.75,rough:0.2,clarity:0.97,curve:0.9,vib:0}},
- {word:'はっ！はっ！はっ！',title:'三段突き',hint:'枝刃の三連突き。刃を絡め取ってくる。疾風なら捌ける。',bonus:0.08,
+ {word:'はっ！はっ！はっ！',title:'三段突き',say:'はっ！はっ！はっ！',vox:{f0:215,size:1.02,breath:0.25,growl:0.2,vib:0,fall:0.05},hint:'枝刃の三連突き。刃を絡め取ってくる。疾風なら捌ける。',bonus:0.08,
   p:{env:mkEnv([[0,0.22,1,'fall'],[0.38,0.6,1,'fall'],[0.76,0.98,1,'fall']]),dur:1.0,pitchHz:420,peak:0.75,rough:0.35,clarity:0.85,curve:0,vib:0}},
- {word:'喝ッ！！',title:'道場主',hint:'剛剣と不動をあわせ持つ。剛剣か疾風でなければ歯が立たない。',bonus:0.2,
+ {word:'喝ッ！！',title:'道場主',say:'かあーっ',vox:{f0:82,size:0.7,breath:0.2,growl:0.85,vib:0,fall:0.2},hint:'剛剣と不動をあわせ持つ。剛剣か疾風でなければ歯が立たない。',bonus:0.2,
   p:{env:mkEnv([[0,0.7,1,'flat'],[0.7,1,0.9,'fall']]),dur:1.1,pitchHz:190,peak:1,rough:0.7,clarity:0.8,curve:0.6,vib:0}}
 ];
 function newCpu(){
   const i=Math.min(dojo.idx,DOJO.length-1),d=DOJO[i];
-  cpu=makeBlade(d.word,JSON.parse(JSON.stringify(d.p)),d.bonus,'dojo'+i);
+  cpu=makeBlade(d.word,JSON.parse(JSON.stringify(d.p)),d.bonus,'dojo'+i);cpu.say=d.say;cpu.vox=d.vox;
   renderFoe();
 }
 function renderFoe(){
@@ -1980,6 +2069,9 @@ function startDuel(){
   for(const f of duel.f)arena.sparks.emit(f.x,30,f.z,50,f.o.accent.clone().multiplyScalar(2),300,120);
   for(const f of duel.f)f.b.st.traits.forEach((k,i)=>setTimeout(()=>{if(duel.running)popup('異能・'+TRAITS[k].name,f.x,110,f.z,'w')},900+i*500));
   shake(8);
+  const c=duel.f[1];
+  if(!muted&&c.pan){const m=moraFor(c.b,0,1);shout(AC,c.pan,AC.currentTime+0.25,m,Math.min(0.95,0.15*m.length+0.22),voiceOf(c.b),{gain:0.6})}
+  setTimeout(()=>{if(duel.running&&!duel.ending)popup(`「${c.b.name}」`,c.x,120,c.z,'c')},250);
 }
 $('#fightBtn').addEventListener('click',()=>{$('#fightBtn').textContent='決闘開始';startDuel()});
 $('#nextBtn').addEventListener('click',()=>{newCpu();$('#fightBtn').textContent='決闘開始';resetDuel()});
