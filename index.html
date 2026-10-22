@@ -6,8 +6,14 @@
 <meta name="description" content="2秒叫ぶと、その声の形が剣に、声のリズムが斬り方になる。剣同士が勝手に戦うブラウザゲーム。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="叫びブレード">
-<meta property="og:description" content="2秒叫ぶと、その声の形が剣になる。最強の叫びを探せ。">
-<meta property="og:image" content="https://c0c260479f.github.io/sakebi-blade/ogp.png">
+<meta property="og:description" content="2秒叫ぶと、声が剣になる。剣は勝手に戦う。何の剣になるかは叫ぶまで分からない。無料・登録不要。">
+<meta property="og:image" content="https://c0c260479f.github.io/sakebi-blade/ogp2.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://c0c260479f.github.io/sakebi-blade/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#16120e">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*,*::before,*::after{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
@@ -31,7 +37,11 @@ body{font-family:var(--f-body);font-size:15px;line-height:1.6}
 .wrap{max-width:1220px;margin:0 auto;padding-block:22px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
 header{display:grid;gap:6px}
 h1{font-family:var(--f-display);font-weight:400;font-size:clamp(38px,8vw,72px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
-h1 span{color:var(--ember);text-shadow:0 0 28px rgba(255,138,42,.55)}
+h1 span span{color:var(--ember);text-shadow:0 0 28px rgba(255,138,42,.55)}
+h1.logo{display:flex;align-items:center;gap:.22em;font-size:clamp(34px,7vw,64px)}
+.logo-icon{width:1.3em;height:1.3em;flex:none;filter:drop-shadow(0 0 18px rgba(255,138,42,.35))}
+.wm{display:inline-flex;align-items:center;white-space:nowrap}
+.wm-blade{width:2.05em;height:.53em;margin:0 .03em;flex:none;filter:drop-shadow(0 0 10px rgba(255,138,42,.45))}
 header p{margin:0;color:var(--muted);max-width:64ch}
 .grid{display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.3fr);grid-template-areas:"forge arena" "vault arena";grid-template-rows:auto 1fr;gap:20px;align-items:start}
 #pForge{grid-area:forge}#pVault{grid-area:vault}#pArena{grid-area:arena}
@@ -189,6 +199,8 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .title-line b.top{background:linear-gradient(135deg,#fff2b0,#ffc94a 55%,#c98a1a);color:#3a2006;box-shadow:0 0 14px rgba(255,201,74,.6)}
 .title-line .rare.top{background:linear-gradient(90deg,#ff8a8a,#ffd36a,#9dffc8,#8ac4ff,#e09dff,#ff8a8a);background-size:300% 100%;animation:prism 3s linear infinite}
 @keyframes prism{to{background-position:300% 0}}
+.foot{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;align-items:center;font-size:12px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line)}
+.tip{color:var(--ember-hi);font-weight:700;text-decoration:underline;text-underline-offset:3px;margin-left:8px}
 .boast{justify-self:start;border-color:var(--ember);color:var(--ember-hi)}
 dialog.share{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--steel);padding:14px;width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}
 dialog.share::backdrop{background:rgba(8,6,4,.78)}
@@ -207,7 +219,7 @@ dialog.share[open]{display:grid;gap:12px}
 <body>
 <div class="wrap">
   <header>
-    <h1>叫び<span>ブレード</span></h1>
+    <h1 class="logo" aria-label="叫びブレード"><svg class="logo-icon" viewBox="0 0 240 240" aria-hidden="true"><rect x="20" y="16" width="204" height="156" rx="44" fill="#ff8a2a"/><path d="M58,170 L104,170 L16,236 Z" fill="#e2e6e9"/><rect x="50" y="164" width="62" height="11" rx="4" fill="#3a2416"/><path transform="translate(66 134) scale(0.112 -0.112)" d="M927 390 969 397V219L927 212V2H728V181L471 141V42H238V22H42V745H471V319L499 323V745H698V354L728 359V745H927ZM238 562V241H281V562Z" fill="#16120e"/></svg><span class="wm" aria-hidden="true">叫び<span>ブレ</span><svg class="wm-blade" viewBox="0 0 170 44" aria-hidden="true"><defs><linearGradient id="hdrSt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#8f989e"/></linearGradient></defs><circle cx="5" cy="22" r="5" fill="#ff8a2a"/><rect x="8" y="18" width="22" height="8" rx="2" fill="#3a2416"/><path d="M12,18 L15,26 M17,18 L20,26 M22,18 L25,26" stroke="#ff8a2a" stroke-width="1.6"/><rect x="30" y="8" width="6" height="28" rx="1.5" fill="#ff8a2a"/><path d="M36,15 L44,11 L51,16 L58,8 L66,14 L73,6 L81,13 L89,9 L97,14 L105,10 L113,15 L121,12 L129,16 L137,14 L145,17 L168,22 L145,27 L120,28 L90,29 L60,29 L36,29 Z" fill="url(#hdrSt)"/></svg><span>ド</span></span></h1>
     <p>2秒叫ぶと、その声の形が剣になり、声のリズムが斬り方になる。剣は勝手に戦う。</p>
   </header>
 
@@ -302,6 +314,7 @@ dialog.share[open]{display:grid;gap:12px}
       </details>
     </section>
   </div>
+  <footer class="foot"><span>叫びブレード · 録音はこの端末の中だけで使われ、どこにも送られない</span><a class="tip" id="tipLink" target="_blank" rel="noopener" hidden>作者を応援する</a></footer>
 </div>
 
 <dialog class="share" id="shareDlg" aria-labelledby="shareH">
@@ -310,7 +323,7 @@ dialog.share[open]{display:grid;gap:12px}
   <div class="prev" id="sharePrev"></div>
   <p class="note" id="shareNote" hidden></p>
   <div class="row dlg-acts"><button class="fight" id="shareGo" disabled>Xに投稿</button><a class="btn" id="shareSave" hidden>保存</a></div>
-  <p class="fine">投稿には、見た人がこの剣と戦えるURLが付く。</p>
+  <p class="fine">投稿には、見た人がこの剣と戦えるURLが付く。<a class="tip" id="tipLink2" target="_blank" rel="noopener" hidden>作者を応援する</a></p>
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2510,10 +2523,15 @@ function shareText(b){
   const prog=me?(dojo.cleared?` 挑戦${dojo.tries}回で道場制覇。`:dojo.best?` 道場${dojo.best}人抜き。`:''):'';
   return `「${b.name}」と叫んだら【${t.name}】ができた。${t.line}${prog} この剣と戦う→ #叫びブレード`;
 }
-let fontsOk=null;
-function fontsReady(){
-  if(!fontsOk)fontsOk=Promise.race([Promise.all([`80px ${FD}`,`700 20px ${FB}`,`700 20px ${FM}`].map(f=>document.fonts?document.fonts.load(f,'叫びブレード剣称号0123456789'):null)),new Promise(r=>setTimeout(r,2500))]).catch(()=>{});
-  return fontsOk;
+// Webフォントは文字ごとに分割されているので、絵に描く文字を先に全部読み込んでおく
+const FIXED_TXT='叫びブレード「」剣称号激レア幻の称号が出た―あなたの叫びは、何の剣になる？その声が剣になる #0123456789威力リーチ速さ重さ異能突き薙ぎ払い連→×'+SITE;
+function fontsReady(b){
+  let txt=FIXED_TXT;
+  if(b){const t=titleOf(b);txt+=b.name+t.name+t.line+typeName(b.segs)+chipList(b).join('')}
+  const key=[...new Set(txt)].sort().join('');
+  if(!fontsReady.done)fontsReady.done=new Set();if(fontsReady.done.has(key))return Promise.resolve();
+  const loads=document.fonts?[`80px ${FD}`,`700 20px ${FB}`,`700 20px ${FM}`].map(f=>document.fonts.load(f,key).catch(()=>{})):[];
+  return Promise.race([Promise.all(loads),new Promise(r=>setTimeout(r,3000))]).then(()=>{fontsReady.done.add(key)});
 }
 function rr(g,x,y,w,h,r){r=Math.min(r,w/2,h/2);g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
 function fitPx(g,text,font,maxW,maxPx,minPx){g.font=`${maxPx}px ${font}`;const w=g.measureText(text).width;return w>maxW?Math.max(minPx,Math.floor(maxPx*maxW/w)):maxPx}
@@ -2666,7 +2684,7 @@ function drawStatBars(g,b,x,y,w,rowH){
 }
 /* --- 画像（1200×675、Xのタイムラインで切れない比率） --- */
 async function renderCard(b){
-  await fontsReady();
+  await fontsReady(b);
   const W=1200,H=675,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
   const t=titleOf(b);
   drawBg(g,W,H,hashStr(b.name));
@@ -2845,7 +2863,7 @@ function drawClipFrame(g,b,T,P){
 }
 function drawWordmarkWidth(g,px){g.save();g.font=`${px}px ${FD}`;const w=g.measureText('叫びブレド').width+px*2.11;g.restore();return w}
 async function recordClip(b,canvas,onProg){
-  await fontsReady();
+  await fontsReady(b);
   const ctx=ac();try{await ctx.resume()}catch(e){}
   const g=canvas.getContext('2d'),P=clipPlan(b);
   const dest=ctx.createMediaStreamDestination(),out=ctx.createGain(),mon=ctx.createGain();
@@ -2872,6 +2890,9 @@ async function recordClip(b,canvas,onProg){
   const blob=new Blob(chunks,{type});blob.xOk=/mp4/.test(type)&&/avc1/.test(full);
   return blob;
 }
+/* --- 投げ銭（URLを入れるとリンクが出る） --- */
+const TIP_URL='';
+if(/^https:\/\//.test(TIP_URL))for(const id of ['#tipLink','#tipLink2']){const a=$(id);a.href=TIP_URL;a.hidden=false}
 /* --- 自慢ダイアログ --- */
 const shareDlg=$('#shareDlg');let shareItem=null,shareKind='img',shareTok=0,clipBusy=false;
 const touchy=()=>matchMedia('(pointer:coarse)').matches;
