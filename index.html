@@ -185,6 +185,7 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .streak{font-family:var(--f-data);font-size:12px;color:var(--muted);text-align:center}
 .title-line{margin:-6px 0 0;font-size:14px;color:var(--muted);line-height:1.5}
 .title-line b{font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--steel);background:#b8321a;border-radius:4px;padding:1px 8px;margin-right:8px;display:inline-block;transform:rotate(-2deg)}
+.title-line .rare{font-style:normal;font-family:var(--f-data);font-size:12px;font-weight:700;color:var(--well);background:linear-gradient(90deg,#ffe08a,#ffc777,#ff8a2a);border-radius:4px;padding:2px 7px;margin-right:8px;vertical-align:2px}
 .boast{justify-self:start;border-color:var(--ember);color:var(--ember-hi)}
 dialog.share{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--steel);padding:14px;width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}
 dialog.share::backdrop{background:rgba(8,6,4,.78)}
@@ -1461,8 +1462,18 @@ function shapeTags(sh){
 /* 称号：剣をひとことで言うと何か（画像と動画のオチになる） */
 function titleOf(b){
   const s=b.st.show,sh=b.shape,n=b.segs.length,shortN=b.segs.filter(g=>!g.long).length;
-  const all=[s.power,s.reach,s.speed,s.weight];
-  if(Math.min(...all)>=60)return{name:'伝説の剣',line:'叫びが天に届いた。めったに出ない。',rare:true};
+  const all=[s.power,s.reach,s.speed,s.weight],srt=[...all].sort((x,y)=>x-y),tags=shapeTags(sh).map(t=>t.k);
+  // ここから激レア（条件がとても狭い。出たら自慢したくなるもの）
+  const nm=toHira(b.name||'').replace(/[！!？?、。,.\s　〜~…]/g,'');
+  if(/^(さけび|叫び)ぶれ[ーえ]ど$/.test(nm))return{name:'自己紹介',line:'このゲームの名前を叫んだ。律儀。',rare:'激レア'};
+  if(nm.length>=3&&new Set(nm).size>1&&[...nm].reverse().join('')===nm)return{name:'回文剣',line:'前から読んでも後ろから読んでも同じ叫び。',rare:'激レア'};
+  if(all.every(v=>v%11===0))return{name:'ゾロ目',line:'能力が全部ゾロ目。宝くじを買え。',rare:'激レア'};
+  if(srt[3]-srt[0]<=3)return{name:'天秤',line:'四つの能力がほぼ同じ。完璧な釣り合い。',rare:'激レア'};
+  if(all.filter(v=>v===77).length>=2)return{name:'ラッキーセブン',line:'77が二つ揃った。今日はついてる。',rare:'激レア'};
+  if(srt[1]>srt[0]&&srt[1]-srt[0]===srt[2]-srt[1]&&srt[2]-srt[1]===srt[3]-srt[2])return{name:'階段',line:'能力がきれいに等間隔で並んだ。',rare:'激レア'};
+  if(Math.abs(b.p.pitchHz-440)<1)return{name:'音叉',line:'声の高さがぴったり440Hz。ラの音。',rare:'激レア'};
+  if(['sori','kata','eda','nami'].every(k=>tags.includes(k)))return{name:'全部のせ',line:'反り・片刃・枝刃・波刃が全部乗った。',rare:'レア'};
+  if(Math.min(...all)>=60)return{name:'伝説の剣',line:'叫びが天に届いた。めったに出ない。',rare:'激レア'};
   if(s.power<=18&&s.reach<=28)return{name:'つまようじ',line:'剣というより楊枝。もっと叫べ。'};
   if(s.reach>=82&&s.weight<=32)return{name:'物干し竿',line:'長い。とにかく長い。そして軽い。'};
   if(s.weight>=82&&s.speed<=28)return{name:'鉄塊',line:'重すぎて振れていない。当たれば痛い。'};
@@ -2419,7 +2430,7 @@ function renderForgeInfo(){
   $('#strip').innerHTML=player.segs.map(s=>`<i class="${s.long?'long':''}" style="left:${s.u0*100}%;width:${(s.u1-s.u0)*100}%;opacity:${0.45+0.55*s.pk}"></i>`).join('');
   const n=player.segs.length,longs=player.segs.filter(s=>s.long).length;
   $('#typeName').textContent=typeName(player.segs);
-  const tt=titleOf(player);$('#titleLine').innerHTML=`<b>${esc(tt.name)}</b>${esc(tt.line)}`;
+  const tt=titleOf(player);$('#titleLine').innerHTML=`<b>${esc(tt.name)}</b>${tt.rare?`<em class="rare">${tt.rare}</em>`:''}${esc(tt.line)}`;
   const tags=shapeTags(player.shape);
   const tr=player.st.traits;
   $('#chips').innerHTML=[...tr.map(k=>`<span class="chip tr" title="${TRAITS[k].desc}">異能・${TRAITS[k].name}</span>`),...tags.map(t=>`<span class="chip" title="${t.desc}">${t.name}</span>`)].join('');
@@ -2604,6 +2615,12 @@ function drawStamp(g,name,x,y,px,align='center'){
   g.fillStyle='#fff4ec';g.textAlign='center';g.textBaseline='middle';g.fillText(name,0,px*0.04);
   g.restore();return W;
 }
+function drawRareTag(g,text,x,y,px){
+  g.save();g.font=`700 ${px}px ${FM}`;const w=g.measureText(text).width+px*0.9;
+  const gr=g.createLinearGradient(x,0,x+w,0);gr.addColorStop(0,'#ffe08a');gr.addColorStop(0.5,'#ffc777');gr.addColorStop(1,'#ff8a2a');
+  g.shadowColor='rgba(255,199,119,.6)';g.shadowBlur=px*0.6;g.fillStyle=gr;rr(g,x,y-px*0.75,w,px*1.5,px*0.25);g.fill();
+  g.shadowBlur=0;g.fillStyle='#16120e';g.textAlign='left';g.textBaseline='middle';g.fillText(text,x+px*0.45,y+px*0.05);g.restore();return w;
+}
 function chipList(b){return[...b.st.traits.map(k=>'異能・'+TRAITS[k].name),...shapeTags(b.shape).map(t=>t.name)]}
 function drawChips(g,list,x,y,px,maxX){
   let cx=x;g.save();g.font=`700 ${px}px ${FB}`;g.textBaseline='middle';g.textAlign='left';
@@ -2635,6 +2652,7 @@ async function renderCard(b){
   drawShout(g,b.name,W/2,206,fitPx(g,`「${b.name}」`,FD,W-150,150,40));
   drawSword2D(g,b,{x:W/2,y:398,k:2.8,maxW:W-110,maxH:200,ang:-0.04,glow:36});
   g.font=`700 18px ${FB}`;g.fillStyle='#a39687';g.textAlign='left';g.textBaseline='middle';g.fillText('称号',56,508);
+  if(t.rare){const rw=g.measureText('称号').width+14;drawRareTag(g,t.rare,56+rw,508,18)}
   drawStamp(g,t.name,52,566,fitPx(g,t.name,FD,560,66,30),'left');
   g.font=`700 25px ${FB}`;g.fillStyle='#e2e6e9';g.textAlign='left';g.fillText(t.line,56,636);
   const sx=716;drawChips(g,chipList(b),sx,504,16,W-48);
@@ -2771,7 +2789,7 @@ function drawClipFrame(g,b,T,P){
     if(st>=0){
       const sc=st<0.22?2.4-1.4*easeOutBack(st/0.22):1;
       g.save();g.globalAlpha*=Math.min(1,st/0.08);g.translate(W/2,566);g.scale(sc,sc);g.drawImage(sp.stamp,-sp.stamp.width/2,-sp.stamp.height/2);g.restore();
-      g.save();g.globalAlpha*=Math.min(1,st/0.2);g.font=`700 17px ${FB}`;g.fillStyle='#a39687';g.textAlign='center';g.textBaseline='middle';g.fillText('称号',W/2,500);g.restore();
+      g.save();g.globalAlpha*=Math.min(1,st/0.2);g.font=`700 17px ${FB}`;g.fillStyle='#a39687';g.textAlign='center';g.textBaseline='middle';if(P.title.rare){g.fillText('称号',W/2-34,500);drawRareTag(g,P.title.rare,W/2+4,500,17)}else g.fillText('称号',W/2,500);g.restore();
       if(st>0.3){g.save();g.globalAlpha*=Math.min(1,(st-0.3)/0.25);g.font=`700 ${fitPx(g,P.title.line,FB,W-80,28,16)}px ${FB}`;g.fillStyle='#e2e6e9';g.textAlign='center';g.textBaseline='middle';g.fillText(P.title.line,W/2,652);g.restore()}
     }
     g.restore();
