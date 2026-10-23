@@ -232,7 +232,7 @@ dialog.share[open]{display:grid;gap:12px}
 <div class="wrap">
   <header>
     <h1 class="logo" aria-label="叫びブレード"><svg class="logo-icon" viewBox="0 0 240 240" aria-hidden="true"><rect x="20" y="16" width="204" height="156" rx="44" fill="#ff8a2a"/><path d="M58,170 L104,170 L16,236 Z" fill="#e2e6e9"/><rect x="50" y="164" width="62" height="11" rx="4" fill="#3a2416"/><path transform="translate(66 134) scale(0.112 -0.112)" d="M927 390 969 397V219L927 212V2H728V181L471 141V42H238V22H42V745H471V319L499 323V745H698V354L728 359V745H927ZM238 562V241H281V562Z" fill="#16120e"/></svg><span class="wm" aria-hidden="true">叫び<span>ブレ</span><svg class="wm-blade" viewBox="0 0 170 44" aria-hidden="true"><defs><linearGradient id="hdrSt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#8f989e"/></linearGradient></defs><circle cx="5" cy="22" r="5" fill="#ff8a2a"/><rect x="8" y="18" width="22" height="8" rx="2" fill="#3a2416"/><path d="M12,18 L15,26 M17,18 L20,26 M22,18 L25,26" stroke="#ff8a2a" stroke-width="1.6"/><rect x="30" y="8" width="6" height="28" rx="1.5" fill="#ff8a2a"/><path d="M36,15 L44,11 L51,16 L58,8 L66,14 L73,6 L81,13 L89,9 L97,14 L105,10 L113,15 L121,12 L129,16 L137,14 L145,17 L168,22 L145,27 L120,28 L90,29 L60,29 L36,29 Z" fill="url(#hdrSt)"/></svg><span>ド</span></span></h1>
-    <p>2秒叫ぶと、その声の形が剣になり、声のリズムが斬り方になる。剣は勝手に戦う。</p>
+    <p>2秒叫ぶと、その声の形が剣になり、声のリズムが斬り方になる。剣は勝手に戦う。家で思いきり叫ぼう。</p>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="画面">
@@ -256,7 +256,7 @@ dialog.share[open]{display:grid;gap:12px}
         <div class="row"><button class="small" id="pickPlay">選んだ2秒を聞く</button><button class="small pri" id="pickGo">この2秒で鍛える</button><button class="link" id="pickCancel">やめる</button></div>
       </div>
       <div class="alt">
-        <span>録音は端末の外に送られない</span>
+        <span>録音は端末の外に送られない。叫べない場所では</span>
         <input type="file" id="fileIn" accept="audio/*,video/*">
         <label for="fileIn">音声・動画ファイルで鍛える</label>
         <button class="link" id="sampleBtn">サンプルで試す</button>
@@ -331,7 +331,7 @@ dialog.share[open]{display:grid;gap:12px}
       </details>
     </section>
   </div>
-  <footer class="foot"><span>叫びブレード · 録音はこの端末の中だけで使われ、どこにも送られない</span><a class="tip" id="tipLink" target="_blank" rel="noopener" hidden>作者を応援する</a></footer>
+  <footer class="foot"><span>叫びブレード · 録音はこの端末の中だけで使われ、どこにも送られない</span><span id="statNote" hidden>遊ばれた回数だけを、個人を特定しない形で数えています</span><a class="tip" id="tipLink" target="_blank" rel="noopener" hidden>作者を応援する</a></footer>
 </div>
 
 <dialog class="share" id="shareDlg" aria-labelledby="shareH">
@@ -1502,9 +1502,8 @@ function titleOf(b){
   if(nm.length>=3&&new Set(nm).size>1&&[...nm].reverse().join('')===nm)return{name:'回文剣',line:'前から読んでも後ろから読んでも同じ叫び。',rare:'激レア'};
   if(all.every(v=>v%11===0))return{name:'ゾロ目',line:'能力が全部ゾロ目。宝くじを買え。',rare:'激レア'};
   if(srt[3]-srt[0]<=1)return{name:'神剣',line:'四つの能力が寸分違わず揃った。幻の一振り。',rare:'幻',top:true,theme:'gold'};
-  // 裏の幻：表では明かさない。威力と重さ、リーチと速さの数字が、鏡に映したように裏返っている
-  const rv=v=>+String(v).padStart(2,'0').split('').reverse().join('');
-  if(s.power===rv(s.weight)&&s.reach===rv(s.speed)&&s.power!==s.weight&&s.reach!==s.speed)return{name:'妖刀',line:'数字が鏡のように裏返った。表に出てはいけない一振り。',rare:'裏の幻',top:true,theme:'ura'};
+  const q=v=>v%10*10+(v/10|0);
+  if([[0,3],[2,1]].every(([a,c])=>q(all[c])===all[a]&&all[a]!==all[c]))return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('eyJuYW1lIjoi5aaW5YiAIiwibGluZSI6IuaVsOWtl+OBjOmPoeOBruOCiOOBhuOBq+ijj+i/lOOBo+OBn+OAguihqOOBq+WHuuOBpuOBr+OBhOOBkeOBquOBhOS4gOaMr+OCiuOAgiIsInJhcmUiOiLoo4/jga7lubsiLCJ0b3AiOnRydWUsInRoZW1lIjoidXJhIn0='),c=>c.charCodeAt(0))));
   if(srt[3]-srt[0]<=3)return{name:'天秤',line:'四つの能力がほぼ同じ。完璧な釣り合い。',rare:'激レア'};
   if(all.filter(v=>v===77).length>=2)return{name:'ラッキーセブン',line:'77が二つ揃った。今日はついてる。',rare:'激レア'};
   if(srt[1]>srt[0]&&srt[1]-srt[0]===srt[2]-srt[1]&&srt[2]-srt[1]===srt[3]-srt[2])return{name:'階段',line:'能力がきれいに等間隔で並んだ。',rare:'激レア'};
@@ -2240,7 +2239,7 @@ function finishDuel(){
   dojo.tries++;
   if(pWin){
     dojo.idx++;dojo.best=Math.max(dojo.best,dojo.idx);
-    if(dojo.idx>=DOJO.length){dojo.cleared=true;dojo.idx=DOJO.length;setBanner('道場制覇！','win',`挑戦 ${dojo.tries}回で十人抜き`);$('#nextBtn').hidden=true;$('#resetBtn').hidden=false}
+    if(dojo.idx>=DOJO.length){if(!dojo.cleared)track('dojo/clear');dojo.cleared=true;dojo.idx=DOJO.length;setBanner('道場制覇！','win',`挑戦 ${dojo.tries}回で十人抜き`);$('#nextBtn').hidden=true;$('#resetBtn').hidden=false}
     else{setBanner('勝利！','win',how);$('#nextBtn').hidden=false;$('#resetBtn').hidden=true}
     $('#fightBtn').hidden=true;$('#retryBtn').hidden=true;}
   else{setBanner('敗北…','lose',how+'　叫び直して、もう一度');
@@ -2423,6 +2422,7 @@ $('#letterCopy').addEventListener('click',()=>{const i=$('#letterUrl'),done=()=>
 function receiveLetter(){
   const h=location.hash||'';if(!h.startsWith('#s'))return false;
   const d=decodeSword(h.slice(2));if(!d)return false;
+  track('letter/open');
   const code=h.slice(2);let v=vault.find(x=>x.code===code);
   if(!v){const b=makeBlade(d.name,d.p,0,'');const id=vaultAdd(b,'letter',null);v=vault.find(x=>x.id===id);v.code=code;saveVault()}
   setMode('free');freeFoe='v:'+v.id;goTab('arena');applyFoe().then(()=>setBanner('果たし状が届いた！','go',`「${d.name}」の剣に挑め`));
@@ -2523,6 +2523,7 @@ function forgeFromAudio(audio,src,name){
   const voice={buffer:audio,t0:p.t0,t1:p.t1};
   setPlayer($('#wordIn').value.trim()||name||'名無し',p,src,voice);
   playerVid=vaultAdd(player,'self',voice);renderVault();afterForge();
+  track(src==='マイクで鍛えた剣'?'forge/mic':'forge/file');track('title/'+titleOf(player).name);
 }
 /* --- ファイルの音で鍛える：長いときは、剣にする2秒を選ぶ --- */
 const PICK_LEN=2;let pickSt=null;
@@ -2575,6 +2576,7 @@ $('#sampleBtn').addEventListener('click',()=>{
   const w=$('#wordIn').value.trim()||['うおおお','ラーメン','はっ！はっ！','ヤッホー'][Math.floor(Math.random()*4)];
   setPlayer(w,synthProfile(hashStr(w)^Math.floor(Math.random()*1e9)),'サンプルの剣');
   playerVid=vaultAdd(player,'self',null);renderVault();afterForge();
+  track('forge/sample');
 });
 /* ================= 自慢：画像と動画 ================= */
 const SITE='c0c260479f.github.io/sakebi-blade';
@@ -3045,6 +3047,10 @@ async function recordClip(b,canvas,onProg){
   const blob=new Blob(chunks,{type});blob.xOk=/mp4/.test(type)&&/avc1/.test(full);
   return blob;
 }
+/* --- 遊ばれた回数（GoatCounter。コードを入れると数え始める） --- */
+const GC_CODE='';
+function track(ev){try{if(window.goatcounter&&window.goatcounter.count)window.goatcounter.count({path:ev,title:ev,event:true})}catch(e){}}
+if(/^[a-z0-9-]+$/.test(GC_CODE)&&/^https?:/.test(location.href)){const sc=document.createElement('script');sc.async=true;sc.dataset.goatcounter=`https://${GC_CODE}.goatcounter.com/count`;sc.src='https://gc.zgo.at/count.js';document.head.append(sc);$('#statNote').hidden=false}
 /* --- 投げ銭（URLを入れるとリンクが出る） --- */
 const TIP_URL='';
 if(/^https:\/\//.test(TIP_URL))for(const id of ['#tipLink','#tipLink2']){const a=$(id);a.href=TIP_URL;a.hidden=false}
@@ -3073,7 +3079,7 @@ async function showShare(kind){
   const prev=$('#sharePrev');prev.classList.toggle('sq',kind==='clip');
   $('#shareGo').disabled=true;$('#shareGo').textContent='Xに投稿';$('#shareSave').hidden=true;shareNote('');
   if(kind==='img'){
-    prev.innerHTML='<span class="wait">画像を作っています…</span>';
+    prev.innerHTML='<span class="wait">画像を作っています…</span>';track('share/image');
     try{const blob=await renderCard(player);if(tok!==shareTok)return;
       const im=new Image();im.alt=`「${player.name}」の剣と称号の画像`;setShareItem(blob,'png');im.src=shareItem.url;prev.replaceChildren(im)}
     catch(e){console.error(e);if(tok===shareTok)prev.innerHTML='<span class="wait">画像を作れませんでした</span>'}
@@ -3086,7 +3092,7 @@ async function showShare(kind){
   try{
     const blob=await recordClip(player,cv,p=>{$('#shareGo').textContent=`作成中 ${Math.round(p*100)}%`});
     if(!blob.size)throw new Error('empty');
-    const ext=blob.type.includes('mp4')?'mp4':'webm';setShareItem(blob,ext);
+    const ext=blob.type.includes('mp4')?'mp4':'webm';setShareItem(blob,ext);track('share/video-'+ext);
     const vd=document.createElement('video');vd.src=shareItem.url;vd.controls=true;vd.playsInline=true;vd.loop=true;vd.setAttribute('aria-label',`「${player.name}」の叫びの動画`);prev.replaceChildren(vd);
     shareNote(blob.xOk?'':'このブラウザで作った動画は、Xにそのまま載せられないことがあります。スマホのSafariかChromeで作ると確実です。');
   }catch(e){console.error(e);prev.innerHTML='<span class="wait">動画を作れませんでした</span>';shareNote('画像で自慢してください。')}
@@ -3100,7 +3106,7 @@ $('#shareClose').addEventListener('click',()=>{if(!clipBusy)shareDlg.close?share
 shareDlg.addEventListener('cancel',e=>{if(clipBusy)e.preventDefault()});
 $('#shareGo').addEventListener('click',async()=>{
   if(!shareItem)return;
-  const url=letterUrl(player),text=shareText(player);
+  const url=letterUrl(player),text=shareText(player);track('share/post-'+shareKind);
   if(canShareFile(shareItem.file)){try{await navigator.share({files:[shareItem.file],text:text+'\n'+url})}catch(e){}return}
   const a=document.createElement('a');a.href=shareItem.url;a.download=shareItem.name;document.body.append(a);a.click();a.remove();
   window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank','noopener');
