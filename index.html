@@ -83,6 +83,12 @@ button:disabled{opacity:.5;cursor:default}
 .meter{flex:1 1 120px;height:10px;border-radius:5px;background:var(--well);border:1px solid var(--line);overflow:hidden;min-width:100px}
 .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember),var(--ember-hi))}
 input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex:1 1 160px;min-width:0}
+.pick{border:1px solid var(--line);border-radius:8px;background:var(--well);padding:10px 12px;display:grid;gap:8px}
+.pick p{margin:0;font-size:12px;color:var(--muted)}
+.pick-wave{position:relative;height:72px;border-radius:6px;overflow:hidden;background:#0b0806;cursor:pointer;touch-action:none}
+.pick-wave canvas{width:100%;height:100%;display:block}
+.pick-win{position:absolute;top:0;bottom:0;border:2px solid var(--ember);border-radius:4px;background:rgba(255,138,42,.18);box-shadow:0 0 12px rgba(255,138,42,.4);pointer-events:none}
+.pick .pri{background:var(--ember);color:var(--well);border-color:var(--ember);font-weight:700}
 .alt{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12px;color:var(--muted)}
 .alt input{display:none}
 .alt label,.link{cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--steel);background:none;border:0;padding:0;font:inherit;font-size:12px}
@@ -240,10 +246,15 @@ dialog.share[open]{display:grid;gap:12px}
         <div class="meter" aria-hidden="true"><i id="meter"></i></div>
       </div>
       <p class="note" id="note" hidden></p>
+      <div class="pick" id="pick" hidden>
+        <p id="pickMsg">長い音なので、剣にする2秒を選ぶ。波形をタップかドラッグで動かせる。</p>
+        <div class="pick-wave" id="pickWave"><canvas id="pickCv" width="640" height="72" aria-hidden="true"></canvas><div class="pick-win" id="pickWin"></div></div>
+        <div class="row"><button class="small" id="pickPlay">選んだ2秒を聞く</button><button class="small pri" id="pickGo">この2秒で鍛える</button><button class="link" id="pickCancel">やめる</button></div>
+      </div>
       <div class="alt">
         <span>録音は端末の外に送られない</span>
-        <input type="file" id="fileIn" accept="audio/*">
-        <label for="fileIn">音声ファイルで鍛える</label>
+        <input type="file" id="fileIn" accept="audio/*,video/*">
+        <label for="fileIn">音声・動画ファイルで鍛える</label>
         <button class="link" id="sampleBtn">サンプルで試す</button>
       </div>
       <div class="stage"><canvas id="forge" width="720" height="300" aria-label="鍛えた剣"></canvas></div>
@@ -2500,18 +2511,58 @@ shoutBtn.addEventListener('click',async()=>{
   shoutBtn.disabled=false;shoutBtn.classList.remove('rec');shoutBtn.textContent='押して叫ぶ';
 });
 function micFail(){showNote(location.protocol==='https:'||location.hostname==='localhost'?'マイクを使えませんでした。ブラウザのマイクの許可をオンにしてから、もう一度押してください。「音声ファイルから鍛える」でも遊べます。':'この画面ではマイクが使えません。「音声ファイルから鍛える」でスマホのボイスメモなどを選んでください。')}
-function forgeFromAudio(audio,src){
+function forgeFromAudio(audio,src,name){
   const p=analyze(audio.getChannelData(0),audio.sampleRate);
-  if(!p){showNote('声が小さすぎて剣になりませんでした。もっと大きく叫んでください。');return}
+  if(!p){showNote(src==='マイクで鍛えた剣'?'声が小さすぎて剣になりませんでした。もっと大きく叫んでください。':'音が小さすぎるか、静かすぎて剣になりませんでした。別の部分か、別のファイルを試してください。');return}
   const voice={buffer:audio,t0:p.t0,t1:p.t1};
-  setPlayer($('#wordIn').value.trim()||'名無し',p,src,voice);
+  setPlayer($('#wordIn').value.trim()||name||'名無し',p,src,voice);
   playerVid=vaultAdd(player,'self',voice);renderVault();afterForge();
 }
+/* --- ファイルの音で鍛える：長いときは、剣にする2秒を選ぶ --- */
+const PICK_LEN=2;let pickSt=null;
+function monoSlice(audio,t0,len){
+  const sr=audio.sampleRate,a=Math.max(0,Math.floor(t0*sr)),n=Math.min(audio.length-a,Math.ceil(len*sr)),out=ac().createBuffer(1,Math.max(1,n),sr),d=out.getChannelData(0),C=audio.numberOfChannels;
+  for(let c=0;c<C;c++){const x=audio.getChannelData(c);for(let i=0;i<n;i++)d[i]+=x[a+i]/C}
+  return out;
+}
+function fileBaseName(f){return(f.name||'').replace(/\.[^.]+$/,'').replace(/[_\-]+/g,' ').trim().slice(0,16)}
+function drawPick(){
+  const st=pickSt,cv=$('#pickCv'),g=cv.getContext('2d'),W=cv.width,H=cv.height,n=st.env.length;
+  g.clearRect(0,0,W,H);g.fillStyle='rgba(255,138,42,.55)';
+  for(let i=0;i<n;i++){const v=Math.max(1,st.env[i]*H*0.46);g.fillRect(i/n*W,H/2-v,Math.max(1,W/n-0.5),v*2)}
+  const win=$('#pickWin');win.style.left=(st.t0/st.dur*100)+'%';win.style.width=(PICK_LEN/st.dur*100)+'%';
+  $('#pickMsg').textContent=`長い音（${st.dur.toFixed(1)}秒）なので、剣にする2秒を選ぶ。波形をタップかドラッグで動かせる。いま ${st.t0.toFixed(1)}〜${(st.t0+PICK_LEN).toFixed(1)}秒`;
+}
+function openPick(audio,name){
+  const sr=audio.sampleRate,x=audio.getChannelData(0),dur=audio.duration,n=Math.min(640,Math.ceil(dur*20)),hop=Math.floor(audio.length/n),env=[];
+  for(let i=0;i<n;i++){let s=0;const a=i*hop;for(let j=0;j<hop;j+=4){const v=x[a+j]||0;s+=v*v}env.push(Math.sqrt(s/(hop/4)))}
+  const mx=Math.max(1e-6,...env);for(let i=0;i<n;i++)env[i]/=mx;
+  // いちばん音が詰まっている2秒を最初の候補にする
+  const w=Math.max(1,Math.round(PICK_LEN/dur*n));let best=0,bi=0,sum=0;
+  for(let i=0;i<n;i++){sum+=env[i];if(i>=w)sum-=env[i-w];if(i>=w-1&&sum>best){best=sum;bi=i-w+1}}
+  pickSt={audio,name,dur,env,t0:clamp(bi/n*dur,0,dur-PICK_LEN)};
+  $('#pick').hidden=false;drawPick();$('#pick').scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function closePick(){if(pickSt&&pickSt.src)try{pickSt.src.stop()}catch(e){}pickSt=null;$('#pick').hidden=true}
+{const wave=$('#pickWave');let dragging=false;
+  const moveTo=ev=>{if(!pickSt)return;const r=wave.getBoundingClientRect(),f=clamp((ev.clientX-r.left)/r.width,0,1);pickSt.t0=clamp(f*pickSt.dur-PICK_LEN/2,0,pickSt.dur-PICK_LEN);drawPick()};
+  wave.addEventListener('pointerdown',ev=>{dragging=true;wave.setPointerCapture(ev.pointerId);moveTo(ev)});
+  wave.addEventListener('pointermove',ev=>{if(dragging)moveTo(ev)});
+  wave.addEventListener('pointerup',()=>{dragging=false});wave.addEventListener('pointercancel',()=>{dragging=false});}
+$('#pickPlay').addEventListener('click',()=>{
+  if(!pickSt)return;const c=ac();if(pickSt.src)try{pickSt.src.stop()}catch(e){}
+  const src=c.createBufferSource();src.buffer=pickSt.audio;src.connect(voiceBus);src.start(0,pickSt.t0,PICK_LEN);pickSt.src=src;
+});
+$('#pickGo').addEventListener('click',()=>{if(!pickSt)return;const st=pickSt;closePick();forgeFromAudio(monoSlice(st.audio,st.t0,PICK_LEN),'ファイルから鍛えた剣',st.name)});
+$('#pickCancel').addEventListener('click',closePick);
 $('#fileIn').addEventListener('change',async e=>{
-  const f=e.target.files[0];if(!f)return;showNote('');
-  try{const audio=await ac().decodeAudioData(await f.arrayBuffer());forgeFromAudio(audio,'ファイルから鍛えた剣')}
-  catch(err){showNote('この音声ファイルは読み込めませんでした。mp3・wav・m4aなどを試してください。')}
-  e.target.value='';
+  const f=e.target.files[0];e.target.value='';if(!f)return;showNote('');closePick();
+  let audio;
+  try{audio=await ac().decodeAudioData(await f.arrayBuffer())}
+  catch(err){showNote('このファイルの音は読み込めませんでした。mp3・wav・m4a・mp4などを試してください。');return}
+  const name=fileBaseName(f);
+  if(audio.duration>PICK_LEN+0.6)openPick(audio,name);
+  else forgeFromAudio(monoSlice(audio,0,audio.duration),'ファイルから鍛えた剣',name);
 });
 $('#sampleBtn').addEventListener('click',()=>{
   ac();
