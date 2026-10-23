@@ -3048,9 +3048,13 @@ async function recordClip(b,canvas,onProg){
   return blob;
 }
 /* --- 遊ばれた回数（GoatCounter。コードを入れると数え始める） --- */
-const GC_CODE='';
-function track(ev){try{if(window.goatcounter&&window.goatcounter.count)window.goatcounter.count({path:ev,title:ev,event:true})}catch(e){}}
-if(/^[a-z0-9-]+$/.test(GC_CODE)&&/^https?:/.test(location.href)){const sc=document.createElement('script');sc.async=true;sc.dataset.goatcounter=`https://${GC_CODE}.goatcounter.com/count`;sc.src='https://gc.zgo.at/count.js';document.head.append(sc);$('#statNote').hidden=false}
+const GC_CODE='sakebiblade';
+// 公開サイトでだけ数える（プレビューや手元では数えない）。読み込み前の出来事は貯めておいて後で送る
+const gcOn=/^[a-z0-9-]+$/.test(GC_CODE)&&location.hostname==='c0c260479f.github.io',gcQ=[];
+function gcSend(ev){try{window.goatcounter.count({path:ev,title:ev,event:true})}catch(e){}}
+function track(ev){if(!gcOn)return;if(window.goatcounter&&window.goatcounter.count)gcSend(ev);else gcQ.push(ev)}
+if(gcOn){const sc=document.createElement('script');sc.async=true;sc.dataset.goatcounter=`https://${GC_CODE}.goatcounter.com/count`;sc.src='https://gc.zgo.at/count.js';
+  sc.onload=()=>setTimeout(()=>{while(gcQ.length)gcSend(gcQ.shift())},300);document.head.append(sc);$('#statNote').hidden=false}
 /* --- 投げ銭（URLを入れるとリンクが出る） --- */
 const TIP_URL='';
 if(/^https:\/\//.test(TIP_URL))for(const id of ['#tipLink','#tipLink2']){const a=$(id);a.href=TIP_URL;a.hidden=false}
