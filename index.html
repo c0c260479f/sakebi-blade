@@ -205,6 +205,10 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .title-line b.top{background:linear-gradient(135deg,#fff2b0,#ffc94a 55%,#c98a1a);color:#3a2006;box-shadow:0 0 14px rgba(255,201,74,.6)}
 .title-line .rare.top{background:linear-gradient(90deg,#ff8a8a,#ffd36a,#9dffc8,#8ac4ff,#e09dff,#ff8a8a);background-size:300% 100%;animation:prism 3s linear infinite}
 @keyframes prism{to{background-position:300% 0}}
+.title-line b.shobo{background:#5b6470;color:#e8ecef;transform:rotate(2deg)}
+.title-line b.gomi{background:#3c3c3c;color:#9d9d9d;transform:rotate(6deg) translateY(2px);opacity:.85}
+.title-line .rare.shobo{background:#7d858f;color:#f0f2f4}
+.title-line .rare.gomi{background:#2b2b2b;color:#bdbdbd;box-shadow:inset 0 0 0 1px #555}
 .title-line b.top.ura{background:linear-gradient(135deg,#12061c,#3b0f4a);color:#ff6b88;box-shadow:0 0 16px rgba(255,59,92,.55),inset 0 0 0 1px rgba(255,59,92,.6)}
 .title-line .rare.top.ura{color:#ffe1e8;background:linear-gradient(90deg,#1a0726,#7c3aed,#ff3b5c,#7c3aed,#1a0726);background-size:300% 100%;animation:prism 2.4s linear infinite reverse}
 .foot{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;align-items:center;font-size:12px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line)}
@@ -1507,7 +1511,9 @@ function titleOf(b){
   if(Math.abs(b.p.pitchHz-440)<1)return{name:'音叉',line:'声の高さがぴったり440Hz。ラの音。',rare:'激レア'};
   if(['sori','kata','eda','nami'].every(k=>tags.includes(k)))return{name:'全部のせ',line:'反り・片刃・枝刃・波刃が全部乗った。',rare:'レア'};
   if(Math.min(...all)>=60)return{name:'伝説の剣',line:'叫びが天に届いた。めったに出ない。',rare:'激レア'};
-  if(s.power<=18&&s.reach<=28)return{name:'つまようじ',line:'剣というより楊枝。もっと叫べ。'};
+  // ハズレ：合計が低すぎる剣は「ただの棒」。しょぼい演出がつく
+  if(all.reduce((a,v)=>a+v,0)<=100)return{name:'ただの棒',line:'剣ですらない。次は腹の底から叫べ。',rare:'大ハズレ',tier:'gomi'};
+  if(s.power<=18&&s.reach<=28)return{name:'つまようじ',line:'剣というより楊枝。もっと叫べ。',rare:'ハズレ',tier:'shobo'};
   if(s.reach>=82&&s.weight<=32)return{name:'物干し竿',line:'長い。とにかく長い。そして軽い。'};
   if(s.weight>=82&&s.speed<=28)return{name:'鉄塊',line:'重すぎて振れていない。当たれば痛い。'};
   if(s.power>=80&&s.reach<=32)return{name:'出刃包丁',line:'短いが、切れ味は本物。'};
@@ -1519,7 +1525,7 @@ function titleOf(b){
   if(sh.curve<-0.3)return{name:'ブーメラン',line:'語尾が下がって、逆に反った。'};
   if(sh.kata&&sh.curve>0.3)return{name:'名刀',line:'澄んだ声で反った、正統派の刀。'};
   if(Math.max(...all)<=62&&Math.min(...all)>=38)return{name:'量産型',line:'どこにでもある剣。逆に珍しい。'};
-  if(s.power<=22)return{name:'なまくら',line:'斬れる気がしない。'};
+  if(s.power<=22)return{name:'なまくら',line:'斬れる気がしない。',rare:'ハズレ',tier:'shobo'};
   if(sh.kata)return{name:'刺身包丁',line:'澄んだ声の片刃。よく切れそう。'};
   const top=STAT_KEYS.reduce((a,k)=>s[k]>s[a]?k:a,'power');
   return{power:{name:'大鉈',line:'力まかせに叩き割る。'},reach:{name:'槍もどき',line:'剣なのに、ほぼ槍。'},speed:{name:'つむじ風',line:'振りが目で追えない。'},weight:{name:'漬物石',line:'重い。動かない。たまに勝つ。'}}[top];
@@ -2463,7 +2469,7 @@ function renderForgeInfo(){
   $('#strip').innerHTML=player.segs.map(s=>`<i class="${s.long?'long':''}" style="left:${s.u0*100}%;width:${(s.u1-s.u0)*100}%;opacity:${0.45+0.55*s.pk}"></i>`).join('');
   const n=player.segs.length,longs=player.segs.filter(s=>s.long).length;
   $('#typeName').textContent=typeName(player.segs);
-  const tt=titleOf(player);$('#titleLine').innerHTML=`<b${tt.top?` class="top ${tt.theme}"`:''}>${esc(tt.name)}</b>${tt.rare?`<em class="rare${tt.top?` top ${tt.theme}`:''}">${tt.rare}</em>`:''}${esc(tt.line)}`;
+  const tt=titleOf(player);$('#titleLine').innerHTML=`<b${tt.top?` class="top ${tt.theme}"`:tt.tier?` class="${tt.tier}"`:''}>${esc(tt.name)}</b>${tt.rare?`<em class="rare${tt.top?` top ${tt.theme}`:tt.tier?` ${tt.tier}`:''}">${tt.rare}</em>`:''}${esc(tt.line)}`;
   const tags=shapeTags(player.shape);
   const tr=player.st.traits;
   $('#chips').innerHTML=[...tr.map(k=>`<span class="chip tr" title="${TRAITS[k].desc}">異能・${TRAITS[k].name}</span>`),...tags.map(t=>`<span class="chip" title="${t.desc}">${t.name}</span>`)].join('');
@@ -2580,7 +2586,7 @@ function shareText(b){
   return `「${b.name}」と叫んだら【${t.name}】ができた。${t.line}${prog} この剣と戦う→ #叫びブレード`;
 }
 // Webフォントは文字ごとに分割されているので、絵に描く文字を先に全部読み込んでおく
-const FIXED_TXT='叫びブレード「」剣称号激レア幻裏の称号が出た―あなたの叫びは、何の剣になる？その声が剣になる #0123456789威力リーチ速さ重さ異能突き薙ぎ払い連→×'+SITE;
+const FIXED_TXT='叫びブレード「」剣称号激レア幻裏の称号が出たハズレ大ぷすっスカッチーン…ポロッもっと叫べば、強くなる次こそ腹の底から―あなたの叫びは、何の剣になる？その声が剣になる #0123456789威力リーチ速さ重さ異能突き薙ぎ払い連→×'+SITE;
 function fontsReady(b){
   let txt=FIXED_TXT;
   if(b){const t=titleOf(b);txt+=b.name+t.name+t.line+typeName(b.segs)+chipList(b).join('')}
@@ -2629,14 +2635,16 @@ function drawWordmark(g,x,y,px,accent='#ff8a2a'){
 }
 function drawLockup(g,x,y,s){drawIcon(g,x,y,s);return s*1.1+drawWordmark(g,x+s*1.1,y+s*0.38,s*0.5)}
 // 叫んだ言葉を、漫画の擬音のように描く
-function drawShout(g,text,cx,cy,px,shown=null){
+function drawShout(g,text,cx,cy,px,shown=null,tier=null){
   const full=`「${text}」`,t=shown==null?full:full.slice(0,shown);
-  g.save();g.translate(cx,cy);g.rotate(-0.04);g.transform(1,0,-0.18,1,0,0);
+  if(tier==='gomi')px*=0.62;
+  g.save();g.translate(cx,cy);g.rotate(tier==='gomi'?0.06:tier==='shobo'?0:-0.04);g.transform(1,0,tier?-0.06:-0.18,1,0,0);
   g.font=`${px}px ${FD}`;g.textBaseline='middle';g.textAlign='left';
   const x0=-g.measureText(full).width/2;
-  g.fillStyle='#6b2c05';g.fillText(t,x0+px*0.06,px*0.06);
-  const gr=g.createLinearGradient(0,-px/2,0,px/2);gr.addColorStop(0,'#ffd08a');gr.addColorStop(0.55,'#ff8a2a');gr.addColorStop(1,'#d9480f');
-  g.shadowColor='rgba(255,138,42,.5)';g.shadowBlur=px*0.25;g.fillStyle=gr;g.fillText(t,x0,0);
+  g.fillStyle=tier?'#2a2a2e':'#6b2c05';g.fillText(t,x0+px*0.06,px*0.06);
+  const gr=g.createLinearGradient(0,-px/2,0,px/2);
+  if(tier){gr.addColorStop(0,'#c9ccd1');gr.addColorStop(1,tier==='gomi'?'#6d6f73':'#8a8f96')}else{gr.addColorStop(0,'#ffd08a');gr.addColorStop(0.55,'#ff8a2a');gr.addColorStop(1,'#d9480f')}
+  if(!tier){g.shadowColor='rgba(255,138,42,.5)';g.shadowBlur=px*0.25}g.fillStyle=gr;g.fillText(t,x0,0);
   g.restore();
 }
 function drawWave(g,env,x,y,w,h,upto,color){
@@ -2687,7 +2695,19 @@ function drawSword2D(g,b,o){
 function drawStamp(g,name,x,y,px,align='center',gold=false){
   g.save();g.font=`${px}px ${FD}`;const w=g.measureText(name).width,pad=px*0.38,h=px*1.4,W=w+pad*2;
   g.translate(align==='left'?x+W/2:x,y);g.rotate(-0.05);
-  const ura=gold==='ura';
+  if(gold==='gomi'){
+    // 大ハズレのはんこ：かすれて、曲がって押されている
+    g.restore();const c=mkCanvas(W+px*1.2,h+px*1.2),cg=c.getContext('2d');drawStamp(cg,name,c.width/2,c.height/2,px,'center','gomiRaw');
+    const r=rng(hashStr(name)+5);cg.globalCompositeOperation='destination-out';
+    for(let i=0;i<70;i++){cg.globalAlpha=0.5+r()*0.5;cg.beginPath();cg.arc(r()*c.width,r()*c.height,1+r()*px*0.12,0,Math.PI*2);cg.fill()}
+    cg.globalAlpha=0.55;cg.fillRect(c.width*0.62,0,c.width*0.4,c.height);
+    g.save();g.translate(align==='left'?x+W/2+6:x,y+6);g.rotate(0.07);g.drawImage(c,-c.width/2,-c.height/2);g.restore();return W;
+  }
+  const ura=gold==='ura',dull=gold==='shobo'||gold==='gomiRaw';
+  if(dull){g.rotate(gold==='shobo'?0.09:0.05);g.shadowColor='rgba(0,0,0,.35)';g.shadowBlur=px*0.15;
+    g.fillStyle=gold==='shobo'?'#5b6470':'#4a4a4a';rr(g,-W/2,-h/2,W,h,px*0.14);g.fill();g.shadowColor='transparent';
+    g.strokeStyle=gold==='shobo'?'rgba(230,235,240,.55)':'rgba(200,200,200,.35)';g.lineWidth=Math.max(2,px*0.04);rr(g,-W/2+px*0.13,-h/2+px*0.13,W-px*0.26,h-px*0.26,px*0.08);g.stroke();
+    g.fillStyle=gold==='shobo'?'#e8ecef':'#a8a8a8';g.textAlign='center';g.textBaseline='middle';g.fillText(name,0,px*0.04);g.restore();return W}
   g.shadowColor=ura?'rgba(255,40,90,.8)':gold?'rgba(255,201,74,.7)':'rgba(0,0,0,.45)';g.shadowBlur=px*(gold?0.7:0.3);g.shadowOffsetY=gold?0:px*0.06;
   if(ura){const gr=g.createLinearGradient(-W/2,-h/2,W/2,h/2);gr.addColorStop(0,'#1a0726');gr.addColorStop(0.5,'#2b0b3a');gr.addColorStop(1,'#12041a');g.fillStyle=gr}
   else if(gold){const gr=g.createLinearGradient(-W/2,-h/2,W/2,h/2);gr.addColorStop(0,'#fff6c8');gr.addColorStop(0.45,'#ffcf4f');gr.addColorStop(0.55,'#f0b632');gr.addColorStop(1,'#b97a12');g.fillStyle=gr}else g.fillStyle='#b8321a';
@@ -2700,7 +2720,9 @@ function drawStamp(g,name,x,y,px,align='center',gold=false){
 function drawRareTag(g,text,x,y,px){
   g.save();g.font=`700 ${px}px ${FM}`;const w=g.measureText(text).width+px*0.9;
   const gr=g.createLinearGradient(x,0,x+w,0);
-  const ura=text.startsWith('裏');
+  const ura=text.startsWith('裏'),miss=text.includes('ハズレ');
+  if(miss){g.fillStyle=text==='大ハズレ'?'#2b2b2b':'#7d858f';rr(g,x,y-px*0.75,w,px*1.5,px*0.25);g.fill();if(text==='大ハズレ'){g.strokeStyle='#555';g.lineWidth=1;g.stroke()}
+    g.fillStyle=text==='大ハズレ'?'#bdbdbd':'#f0f2f4';g.textAlign='left';g.textBaseline='middle';g.fillText(text,x+px*0.45,y+px*0.05);g.restore();return w}
   if(ura)['#2a0a3a','#7c3aed','#ff3b5c','#7c3aed'].forEach((c,i)=>gr.addColorStop(i/3,c));
   else if(text==='幻')['#ff8a8a','#ffd36a','#9dffc8','#8ac4ff','#e09dff'].forEach((c,i)=>gr.addColorStop(i/4,c));
   else{gr.addColorStop(0,'#ffe08a');gr.addColorStop(0.5,'#ffc777');gr.addColorStop(1,'#ff8a2a')}
@@ -2733,6 +2755,12 @@ function drawGoldFrame(g,W,H,th=TH.gold){
   g.save();const gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,th.frame[0]);gr.addColorStop(0.5,th.frame[1]);gr.addColorStop(1,th.frame[2]);
   g.strokeStyle=gr;g.lineWidth=6;g.strokeRect(9,9,W-18,H-18);g.lineWidth=1.5;g.strokeRect(19,19,W-38,H-38);g.restore();
 }
+// ハズレの演出：色が抜けて、上から縦線（ずーん）が落ちる
+function desat(g,W,H,k,dark=0.3){if(k<=0)return;g.save();g.globalCompositeOperation='saturation';g.globalAlpha=k;g.fillStyle='#808080';g.fillRect(0,0,W,H);g.globalCompositeOperation='source-over';g.globalAlpha=k*dark;g.fillStyle='#0b0b0e';g.fillRect(0,0,W,H);g.restore()}
+function drawGloom(g,W,H,k,seed,n=30,maxLen=0.45){if(k<=0)return;const r=rng(seed+77);g.save();g.lineCap='round';
+  for(let i=0;i<n;i++){const x=r()*W,len=H*(0.12+r()*maxLen)*Math.min(1,k*1.3),w=1.5+r()*3.5;g.strokeStyle=`rgba(10,10,18,${(0.35+r()*0.4)*k})`;g.lineWidth=w;g.beginPath();g.moveTo(x,-4);g.lineTo(x,len);g.stroke()}
+  g.restore()}
+function drawSad(g,text,x,y,px,alpha=1,rot=0.08){g.save();g.globalAlpha*=alpha;g.translate(x,y);g.rotate(rot);g.font=`700 ${px}px ${FB}`;g.textAlign='center';g.textBaseline='middle';g.lineWidth=px*0.18;g.strokeStyle='rgba(10,10,14,.8)';g.strokeText(text,0,0);g.fillStyle='#c4c7cc';g.fillText(text,0,0);g.restore()}
 function chipList(b){return[...b.st.traits.map(k=>'異能・'+TRAITS[k].name),...shapeTags(b.shape).map(t=>t.name)]}
 function drawChips(g,list,x,y,px,maxX){
   let cx=x;g.save();g.font=`700 ${px}px ${FB}`;g.textBaseline='middle';g.textAlign='left';
@@ -2764,17 +2792,27 @@ async function renderCard(b){
   drawLockup(g,48,30,54);
   g.font=`700 20px ${FM}`;g.fillStyle='#a39687';g.textAlign='right';g.textBaseline='middle';g.fillText(typeName(b.segs),W-48,58);
   drawWave(g,b.p.env,80,398,W-160,64,1,'rgba(255,138,42,.15)');
-  drawShout(g,b.name,W/2,206,fitPx(g,`「${b.name}」`,FD,W-150,150,40));
-  drawSword2D(g,b,{x:W/2,y:398,k:2.8,maxW:W-110,maxH:200,ang:-0.04,glow:t.top?50:36,accent:t.top?th.accent:undefined});
+  const lame=t.tier;
+  drawShout(g,b.name,W/2,lame==='gomi'?226:206,fitPx(g,`「${b.name}」`,FD,W-150,150,40),null,lame);
+  const swo={x:W/2,y:lame==='gomi'?418:398,k:2.8,maxW:W-110,maxH:200,ang:lame==='gomi'?0.32:-0.04,glow:t.top?50:lame?(lame==='gomi'?0:10):36,accent:t.top?th.accent:lame==='gomi'?'#8d8d8d':undefined};
+  const swf=drawSword2D(g,b,swo);
   if(t.top)bandAt(440);
   g.font=`700 18px ${FB}`;g.fillStyle='#a39687';g.textAlign='left';g.textBaseline='middle';g.fillText('称号',56,508);
   if(t.rare){const rw=g.measureText('称号').width+14;drawRareTag(g,t.rare,56+rw,508,18)}
-  drawStamp(g,t.name,52,566,fitPx(g,t.name,FD,560,66,30),'left',t.top?t.theme:false);
+  drawStamp(g,t.name,52,566,fitPx(g,t.name,FD,560,66,30),'left',t.top?t.theme:lame||false);
   if(t.top)drawGoldFrame(g,W,H,th);
   g.font=`700 25px ${FB}`;g.fillStyle='#e2e6e9';g.textAlign='left';g.fillText(t.line,56,636);
   const sx=716;drawChips(g,chipList(b),sx,504,16,W-48);
   drawStatBars(g,b,sx,544,W-48-sx,28);
   g.font=`700 15px ${FM}`;g.fillStyle='#7a6e62';g.textAlign='right';g.fillText(SITE,W-48,t.top?H-32:H-16);
+  if(lame){
+    desat(g,W,H,lame==='gomi'?1:0.7,lame==='gomi'?0.35:0.2);
+    drawLockup(g,48,30,54);
+    drawGloom(g,W,H,1,hashStr(b.name),lame==='gomi'?34:14,lame==='gomi'?0.5:0.25);
+    const tip=swf.map(b.shape.x0+b.shape.total,0);
+    if(lame==='gomi')drawSad(g,'チーン…',Math.min(W-150,tip[0]+40),Math.min(470,tip[1]+30),44,1,0.1);
+    else drawSad(g,'ぷすっ',Math.min(W-90,tip[0]+60),tip[1]-30,34,1,-0.06);
+  }
   return new Promise((res,rej)=>c.toBlob(bl=>bl?res(bl):rej(new Error('toBlob')),'image/png'));
 }
 /* --- 動画（720×720・声つき） --- */
@@ -2789,15 +2827,15 @@ function voicePeak(v){
   for(let i=Math.floor(v.t0*sr),e=Math.min(d.length,Math.ceil(v.t1*sr));i<e;i++)m=Math.max(m,Math.abs(d[i]));
   return v.peakCache=m;
 }
-function clipVoice(ctx,dest,b,when,seg){
+function clipVoice(ctx,dest,b,when,seg,rate=1){
   const v=b.voice;
   if(v){
     const span=v.t1-v.t0,s=seg?v.t0+seg.u0*span:Math.max(0,v.t0-0.04),len=seg?Math.max(0.08,(seg.u1-seg.u0)*span):span+0.14;
     const src=ctx.createBufferSource();src.buffer=v.buffer;const g=ctx.createGain();g.gain.value=clamp(0.85/voicePeak(v),0.5,10);
-    src.connect(g);g.connect(dest);src.start(when,s,len);return;
+    src.playbackRate.value=rate;src.connect(g);g.connect(dest);src.start(when,s,len);return;
   }
   const idx=seg?Math.max(0,b.segs.indexOf(seg)):0;
-  shout(ctx,dest,when,seg?moraFor(b,idx,b.segs.length):moraFor(b,0,1),seg?clamp((seg.u1-seg.u0)*b.p.dur*1.4,0.18,0.9):clamp(b.p.dur,0.45,2.4),voiceOf(b),{gain:0.7});
+  shout(ctx,dest,when,seg?moraFor(b,idx,b.segs.length):moraFor(b,0,1),seg?clamp((seg.u1-seg.u0)*b.p.dur*1.4,0.18,0.9):clamp(b.p.dur,0.45,2.4),voiceOf(b),{gain:0.7,semi:12*Math.log2(rate)});
 }
 function clipSfx(ctx,dest,kind,when){
   const nz=(dur,type,f0,f1,q,gain)=>{const n=ctx.createBufferSource();n.buffer=noiseBuf;n.loop=true;const f=ctx.createBiquadFilter();f.type=type;f.Q.value=q;f.frequency.setValueAtTime(f0,when);f.frequency.exponentialRampToValueAtTime(f1,when+dur);const g=ctx.createGain();g.gain.setValueAtTime(gain,when);g.gain.exponentialRampToValueAtTime(0.001,when+dur);n.connect(f);f.connect(g);g.connect(dest);n.start(when);n.stop(when+dur+0.05)};
@@ -2805,6 +2843,14 @@ function clipSfx(ctx,dest,kind,when){
   if(kind==='boom'){tone('sine',130,42,0.6,0.7);nz(0.35,'lowpass',900,200,0.7,0.5)}
   if(kind==='clang'){for(const [fr,d] of [[2350,0.7],[3520,0.5],[5100,0.3]])tone('sine',fr,fr*0.99,d,0.14);nz(0.15,'bandpass',4000,3000,1.2,0.35);tone('triangle',180,90,0.3,0.35)}
   if(kind==='whoosh')nz(0.28,'bandpass',500,4200,1.4,0.7);
+  if(kind==='pss'){nz(0.5,'bandpass',1400,250,1.1,0.35);tone('sine',760,170,0.45,0.22)}
+  if(kind==='chin'){for(const [f,gn,d] of [[1568,0.3,2.4],[3136,0.08,1.2],[4704,0.04,0.8]])tone('sine',f,f*0.998,d,gn)}
+  if(kind==='thud'){tone('sine',120,48,0.4,0.65);nz(0.22,'lowpass',500,150,0.7,0.45)}
+  if(kind==='wah'){// 残念なトロンボーン
+    [[196,0],[185,0.42],[174.6,0.84],[164.8,1.26]].forEach(([f,t],i)=>{const t0=when+t,d=i<3?0.38:1.2,o=ctx.createOscillator(),lp=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(f,t0);
+      if(i===3){const l=ctx.createOscillator(),lg=ctx.createGain();l.frequency.value=5.5;lg.gain.value=4;l.connect(lg);lg.connect(o.frequency);l.start(t0+0.3);l.stop(t0+d)}
+      lp.type='lowpass';lp.frequency.setValueAtTime(500,t0);lp.frequency.linearRampToValueAtTime(1300,t0+0.08);lp.frequency.linearRampToValueAtTime(700,t0+d);
+      g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(0.16,t0+0.04);g.gain.setValueAtTime(0.16,t0+d-0.08);g.gain.exponentialRampToValueAtTime(0.001,t0+d);o.connect(lp);lp.connect(g);g.connect(dest);o.start(t0);o.stop(t0+d+0.02)})}
   if(kind==='drone'){
     for(const f of [55,58.3,82.4,110.8]){const o=ctx.createOscillator(),lp=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o.frequency.value=f;lp.type='lowpass';lp.frequency.setValueAtTime(300,when);lp.frequency.exponentialRampToValueAtTime(1400,when+1.2);
       g.gain.setValueAtTime(0.0001,when);g.gain.exponentialRampToValueAtTime(0.09,when+1.0);g.gain.exponentialRampToValueAtTime(0.001,when+2.0);o.connect(lp);lp.connect(g);g.connect(dest);o.start(when);o.stop(when+2.1)}
@@ -2817,13 +2863,13 @@ function clipSfx(ctx,dest,kind,when){
 }
 function clipPlan(b){
   const v=b.voice,vd=clamp(v?v.t1-v.t0:b.p.dur,0.45,2.6);
-  const top=!!titleOf(b).top,T0=0.55,TF=T0+vd,TG=TF+0.45,TS=TG+(top?1.5:0),TSL=TS+1.15,TE=TSL+1.35,TEND=TE+(top?2.1:1.7);
+  const tt=titleOf(b),top=!!tt.top,tier=tt.tier||null,T0=0.55,TF=T0+vd,TG=TF+0.45,TS=TG+(top?1.5:tier==='gomi'?1.0:tier==='shobo'?0.3:0),TSL=TS+1.15,TE=TSL+1.35,TEND=TE+(top?2.1:1.7);
   const r=rng(hashStr(b.name)+7),sparks=[];
   for(let i=0;i<70;i++)sparks.push({te:T0+vd*i/70,frac:i/70,vx:(r()-0.3)*520,vy:-(120+r()*380),life:0.35+r()*0.5,s:1.5+r()*2.5});
   const burst=[];for(let i=0;i<90;i++){const a=r()*Math.PI*2,sp=150+r()*650;burst.push({vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-120,life:0.4+r()*0.7,s:1.5+r()*3})}
   const motes=[];for(let i=0;i<34;i++)motes.push({x:r()*720,v:30+r()*70,o:r()*800,w:0.5+r()*1.5,s:1.5+r()*2});
   const segs=b.segs.slice().sort((x,y)=>y.pk-x.pk);
-  return{top,th:thOf(titleOf(b)),TG,motes,vd,T0,TF,TS,TSL,TE,TEND,sparks,burst,seg:segs[0]||null,title:titleOf(b),bg:null};
+  return{top,tier,th:thOf(titleOf(b)),TG,motes,vd,T0,TF,TS,TSL,TE,TEND,sparks,burst,seg:segs[0]||null,title:titleOf(b),bg:null};
 }
 const easeOut=t=>1-Math.pow(1-clamp(t,0,1),3);
 function mkCanvas(w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.ceil(w));c.height=Math.max(1,Math.ceil(h));return c}
@@ -2836,23 +2882,24 @@ function clipSprites(b,P){
   const full=`「${b.name}」`,mg=mkCanvas(10,10).getContext('2d'),px=fitPx(mg,full,FD,W-90,118,30);
   mg.font=`${px}px ${FD}`;const fw=mg.measureText(full).width;
   sp.shoutW=fw+px*1.6;sp.shoutH=px*2.2;sp.shout=new Map();sp.full=full;
-  sp.getShout=n=>{if(!sp.shout.has(n)){const c=mkCanvas(sp.shoutW,sp.shoutH);drawShout(c.getContext('2d'),b.name,sp.shoutW/2,sp.shoutH/2,px,n);sp.shout.set(n,c)}return sp.shout.get(n)};
+  sp.getShout=n=>{if(!sp.shout.has(n)){const c=mkCanvas(sp.shoutW,sp.shoutH);drawShout(c.getContext('2d'),b.name,sp.shoutW/2,sp.shoutH/2,px,n,t.tier);sp.shout.set(n,c)}return sp.shout.get(n)};
   // 剣（光なし・光だけ）を水平に描いておく
   const pad=70,f0=swordFit(b,{x:0,y:0,k:2.1,maxW:W-56,maxH:200,ang:0}),sh=b.shape;
   const cw=sh.total*f0.k+pad*2,ch=f0.h*f0.k+pad*2;
   sp.sw=mkCanvas(cw,ch);sp.glow=mkCanvas(cw,ch);
-  const so={x:cw/2,y:ch/2,k:f0.k,maxW:1e9,maxH:1e9,ang:0,accent:t.top?thOf(t).accent:undefined};
+  const so={x:cw/2,y:ch/2,k:f0.k,maxW:1e9,maxH:1e9,ang:0,accent:t.top?thOf(t).accent:t.tier==='gomi'?'#8d8d8d':undefined};
   drawSword2D(sp.sw.getContext('2d'),b,so);
   const gg=sp.glow.getContext('2d');drawSword2D(gg,b,{...so,glow:46});gg.globalCompositeOperation='destination-out';drawSword2D(gg,b,so);
   sp.k=f0.k;sp.cw=cw;sp.ch=ch;sp.cropAt=frac=>cw/2+f0.k*(sh.bs+frac*sh.L-f0.cxs)+4;
   // 称号のはんこ
   const spx=fitPx(mg,t.name,FD,W-160,74,30);mg.font=`${spx}px ${FD}`;const stw=mg.measureText(t.name).width+spx*1.6+40;
-  sp.stamp=mkCanvas(stw,spx*2.2);drawStamp(sp.stamp.getContext('2d'),t.name,stw/2,spx*1.1,spx,'center',t.top?t.theme:false);
+  sp.stamp=mkCanvas(stw,spx*2.2);drawStamp(sp.stamp.getContext('2d'),t.name,stw/2,spx*1.1,spx,'center',t.top?t.theme:t.tier||false);
   // 締めの画面
   sp.end=mkCanvas(W,W);{const g=sp.end.getContext('2d');const lw=110*1.1+drawWordmarkWidth(g,55);drawLockup(g,(W-lw)/2,232,110);
     g.font=`700 30px ${FB}`;g.fillStyle='#e2e6e9';g.textAlign='center';g.textBaseline='middle';g.fillText('あなたの叫びは、何の剣になる？',W/2,428);
     g.font=`700 22px ${FM}`;g.fillStyle='#ffc777';g.fillText(SITE,W/2,486);g.font=`700 20px ${FB}`;g.fillStyle='#a39687';g.fillText('#叫びブレード',W/2,528);
-    if(t.top){const th=thOf(t);g.font=`700 24px ${FB}`;g.fillStyle=th.accent;g.fillText(`${th.end}「${t.name}」が出た`,W/2,600)}}
+    if(t.top){const th=thOf(t);g.font=`700 24px ${FB}`;g.fillStyle=th.accent;g.fillText(`${th.end}「${t.name}」が出た`,W/2,600)}
+    if(t.tier){g.font=`700 22px ${FB}`;g.fillStyle='#a39687';g.fillText(t.tier==='gomi'?'次こそ、腹の底から叫べ':'もっと叫べば、もっと強くなる',W/2,600)}}
   return sp;
 }
 function blitSword(g,sp,x,y,ang,frac,alpha,glowA){
@@ -2871,17 +2918,19 @@ function drawClipFrame(g,b,T,P){
   for(const m of P.motes){const y=H+20-((T*m.v+m.o)%(H+40)),x=m.x+Math.sin(T*m.w+m.o)*14,a=0.25+0.35*Math.sin(T*3+m.o)**2;g.fillStyle=`rgba(255,150,60,${a})`;g.fillRect(x,y,m.s,m.s)}
   g.restore();
   const prog=clamp((T-P.T0)/P.vd,0,1),env=b.p.env,e=T>=P.T0&&T<=P.TF?env[Math.min(env.length-1,Math.floor(prog*env.length))]:0;
-  const after=T-P.TF,flash=after>=0?Math.max(0,1-after/0.3):0,sl=T-P.TSL;
+  const lame=P.tier,after=T-P.TF,flash=after>=0&&!lame?Math.max(0,1-after/0.3):0,sl=T-P.TSL;
   // 揺れ：声の大きさと、斬った瞬間
-  const shakeK=e*9+(sl>0&&sl<0.35?(1-sl/0.35)*14:0)+(after>=0&&after<0.25?(1-after/0.25)*10:0);
+  const shakeK=e*9+(!lame&&sl>0&&sl<0.35?(1-sl/0.35)*14:0)+(!lame&&after>=0&&after<0.25?(1-after/0.25)*10:0);
   const r=rng(Math.floor(T*60)+3),sx=(r()-0.5)*shakeK,sy=(r()-0.5)*shakeK;
   const SY=192,WY=388;
   if(T<P.TE+0.35){
     g.save();g.globalAlpha=T<P.TE?1:1-(T-P.TE)/0.35;g.translate(sx,sy);
     g.drawImage(sp.logo,24,20);
     // 叫び文字：声に合わせて一文字ずつ。斬られたら真っ二つ
-    const shown=T<P.T0?0:Math.max(1,Math.ceil(prog*sp.full.length)),cutT=sl-0.1;
-    const img=sp.getShout(cutT>0?sp.full.length:shown),ix=W/2-sp.shoutW/2,iy=SY-sp.shoutH/2;
+    const shown=T<P.T0?0:Math.max(1,Math.ceil(prog*sp.full.length)),cutT=lame?0:sl-0.1;
+    // ハズレ：伸びきった剣がしおれていく
+    const droop=lame==='gomi'?easeOut((T-P.TF-0.25)/0.7)*0.55:lame==='shobo'?easeOut((T-P.TF-0.15)/0.5)*0.12:0;
+    const img=sp.getShout(cutT>0?sp.full.length:shown),ix=W/2-sp.shoutW/2,iy=SY-sp.shoutH/2+droop*30;
     if(shown>0&&cutT<=0)g.drawImage(img,ix,iy);
     else if(cutT>0){
       const d=easeOut(cutT/0.6)*46+cutT*14,ang=-0.38,ca=Math.cos(ang),sa=Math.sin(ang),nx=-sa,ny=ca,L=900;
@@ -2894,21 +2943,27 @@ function drawClipFrame(g,b,T,P){
     drawWave(g,env,40,WY,W-80,52,T<P.T0?0:prog,'rgba(255,138,42,.2)');
     if(T<P.T0+0.25){g.save();g.globalAlpha*=T<P.T0?1:1-(T-P.T0)/0.25;g.font=`700 30px ${FB}`;g.fillStyle='#e2e6e9';g.textAlign='center';g.textBaseline='middle';g.fillText('叫ぶと、その声が剣になる',W/2,WY);g.restore()}
     // 剣：声が続くあいだ伸びていく。斬る場面では一回転
-    const base=-0.05,fit=swordFit(b,{x:W/2,y:WY,k:sp.k,maxW:1e9,maxH:1e9,ang:base});
+    const base=-0.05+droop,SWY=WY+droop*40,fit=swordFit(b,{x:W/2,y:SWY,k:sp.k,maxW:1e9,maxH:1e9,ang:base});
     if(T>=P.T0){
+      if(lame==='gomi'){const f=Math.max(0,sl),fy=900*f*f,fr=f*2.4;blitSword(g,sp,W/2+f*60,SWY+fy,base+fr,Math.max(0.02,prog),1,0.2+e*0.4)}
+      else if(lame==='shobo'){const sw=sl>0&&sl<0.6?Math.sin(sl/0.6*Math.PI)*0.45:0;blitSword(g,sp,W/2,SWY,base-sw,Math.max(0.02,prog),1,0.3+e*0.5)}
+      else{
       const spin=sl>0?easeOut(sl/0.42):0;
       if(sl>0&&sl<0.6)for(let j=4;j>=1;j--){const a2=base+easeOut(Math.max(0,sl-j*0.03)/0.42)*Math.PI*2;blitSword(g,sp,W/2,WY,a2,1,0.12*(5-j)/4,0)}
       blitSword(g,sp,W/2,WY,base+spin*Math.PI*2,Math.max(0.02,prog),1,0.45+e*0.6+flash);
+      }
     }
     // 火花：伸びる切っ先から
     g.save();g.globalCompositeOperation='lighter';
     const N=b.shape.top.length-1;
     for(const s of P.sparks){const dt=T-s.te;if(dt<0||dt>s.life)continue;const i=Math.round(s.frac*N),p=fit.map(b.shape.top[i][0],(b.shape.top[i][1]+b.shape.bot[i][1])/2);
       const a=1-dt/s.life;g.fillStyle=`rgba(255,${150+Math.round(90*a)},60,${a})`;g.fillRect(p[0]+s.vx*dt,p[1]+s.vy*dt+600*dt*dt,s.s,s.s)}
-    if(after>=0){const p=fit.map(b.shape.x0+b.shape.total*0.62,0);for(const s of P.burst){const dt=after;if(dt>s.life)continue;const a=1-dt/s.life;g.fillStyle=`rgba(255,${170+Math.round(80*a)},90,${a})`;g.fillRect(p[0]+s.vx*dt,p[1]+s.vy*dt+500*dt*dt,s.s,s.s)}}
+    if(after>=0&&!lame){const p=fit.map(b.shape.x0+b.shape.total*0.62,0);for(const s of P.burst){const dt=after;if(dt>s.life)continue;const a=1-dt/s.life;g.fillStyle=`rgba(255,${170+Math.round(80*a)},90,${a})`;g.fillRect(p[0]+s.vx*dt,p[1]+s.vy*dt+500*dt*dt,s.s,s.s)}}
     g.restore();
+    // ハズレ：切っ先から灰色の煙がぷすっと出る
+    if(lame&&after>=0&&after<1.2){const p=fit.map(b.shape.x0+b.shape.total,0);g.save();for(const [i,s] of P.burst.slice(0,lame==='gomi'?14:24).entries()){const dt=after,a=Math.max(0,1-dt/1.2);g.fillStyle=`rgba(150,150,155,${a*0.5})`;g.beginPath();g.arc(p[0]+s.vx*0.08*dt*3,p[1]-30*dt+s.vy*0.05*dt,4+dt*14*(0.5+i%3*0.3),0,Math.PI*2);g.fill()}g.restore()}
     // 斬撃の線
-    if(sl>0&&sl<0.4){const k=sl/0.4,ang=-0.38,L=W*0.9*Math.min(1,k*3);
+    if(!lame&&sl>0&&sl<0.4){const k=sl/0.4,ang=-0.38,L=W*0.9*Math.min(1,k*3);
       g.save();g.globalCompositeOperation='lighter';g.globalAlpha*=1-k;g.lineCap='round';
       g.strokeStyle='rgba(255,138,42,.5)';g.lineWidth=26*(1-k)+6;g.beginPath();g.moveTo(W/2-Math.cos(ang)*L/2,SY-Math.sin(ang)*L/2);g.lineTo(W/2+Math.cos(ang)*L/2,SY+Math.sin(ang)*L/2);g.stroke();
       g.strokeStyle='#fff3dd';g.lineWidth=10*(1-k)+2;g.stroke();g.restore()}
@@ -2916,13 +2971,23 @@ function drawClipFrame(g,b,T,P){
     const st=T-P.TS;
     if(st>=0){
       if(P.top){const gr=g.createLinearGradient(0,450,0,H);gr.addColorStop(0,'rgba(16,12,9,0)');gr.addColorStop(0.4,'rgba(16,12,9,.75)');gr.addColorStop(1,'rgba(16,12,9,.88)');g.save();g.globalAlpha*=Math.min(1,st/0.3);g.fillStyle=gr;g.fillRect(-20,450,W+40,H-430);g.restore()}
-      const sc=st<0.22?2.4-1.4*easeOutBack(st/0.22):1;
-      g.save();g.globalAlpha*=Math.min(1,st/0.08);g.translate(W/2,566);g.scale(sc,sc);g.drawImage(sp.stamp,-sp.stamp.width/2,-sp.stamp.height/2);g.restore();
+      const sc=lame?1:st<0.22?2.4-1.4*easeOutBack(st/0.22):1,sdy=lame==='gomi'?-60*(1-easeOut(st/0.9)):lame?-90*(1-easeOutBack(Math.min(1,st/0.45))):0;
+      g.save();g.globalAlpha*=Math.min(1,st/(lame?0.3:0.08));g.translate(W/2,566+sdy);g.scale(sc,sc);g.drawImage(sp.stamp,-sp.stamp.width/2,-sp.stamp.height/2);g.restore();
       g.save();g.globalAlpha*=Math.min(1,st/0.2);g.font=`700 17px ${FB}`;g.fillStyle='#a39687';g.textAlign='center';g.textBaseline='middle';if(P.title.rare){g.fillText('称号',W/2-34,500);drawRareTag(g,P.title.rare,W/2+4,500,17)}else g.fillText('称号',W/2,500);g.restore();
       if(st>0.3){g.save();g.globalAlpha*=Math.min(1,(st-0.3)/0.25);g.font=`700 ${fitPx(g,P.title.line,FB,W-80,28,16)}px ${FB}`;g.fillStyle='#e2e6e9';g.textAlign='center';g.textBaseline='middle';g.fillText(P.title.line,W/2,652);g.restore()}
     }
     g.restore();
     if(flash>0){g.save();g.globalAlpha=flash*0.75;g.fillStyle='#fff1dc';g.fillRect(0,0,W,H);g.restore()}
+    // ハズレ：色が抜け、縦線が落ち、ひとこと
+    if(lame&&after>=0){
+      const k=clamp(after/(lame==='gomi'?0.9:0.6),0,1)*(T<P.TE?1:Math.max(0,1-(T-P.TE)/0.35));
+      desat(g,W,H,k*(lame==='gomi'?1:0.75),lame==='gomi'?0.35:0.2);
+      drawGloom(g,W,H,k,hashStr(b.name),lame==='gomi'?30:12,lame==='gomi'?0.45:0.22);
+      const tip=fit.map(b.shape.x0+b.shape.total,0);
+      if(lame==='shobo'&&after<1.1)drawSad(g,'ぷすっ',Math.min(W-70,tip[0]+40),tip[1]-30-after*20,30,Math.min(1,after/0.1)*(after>0.8?(1.1-after)/0.3:1));
+      if(lame==='gomi'){const u=T-P.TF-0.35;if(u>0&&T<P.TSL)drawSad(g,'チーン…',W/2+120,300,52,Math.min(1,u/0.25)*(T>P.TSL-0.3?(P.TSL-T)/0.3:1),0.08)}
+      if(sl>0&&sl<0.9)drawSad(g,lame==='gomi'?'ポロッ':'スカッ',lame==='gomi'?W/2+150:W/2-120,lame==='gomi'?470:330,lame==='gomi'?40:34,Math.min(1,sl/0.1)*(sl>0.6?(0.9-sl)/0.3:1),lame==='gomi'?0.15:-0.1);
+    }
     // 幻の称号：暗転して「幻」が浮かび、金の光で弾ける
     if(P.top&&T>=P.TG&&T<P.TS+0.5){
       const u=T-P.TG,D=P.TS-P.TG,dark=u<0.3?u/0.3:T<P.TS?1:1-(T-P.TS)/0.5;
@@ -2942,6 +3007,18 @@ function drawClipFrame(g,b,T,P){
   if(T>=P.TE){const k=clamp((T-P.TE)/0.4,0,1);g.save();g.globalAlpha=k;g.drawImage(sp.end,0,(1-easeOut(k))*20);g.restore()}
 }
 function drawWordmarkWidth(g,px){g.save();g.font=`${px}px ${FD}`;const w=g.measureText('叫びブレド').width+px*2.11;g.restore();return w}
+// 動画の音：当たりは派手に、ハズレは残念に
+function scheduleClipAudio(ctx,out,b,P,start,end=1e9){
+  clipVoice(ctx,out,b,start+P.T0,null);
+  if(P.tier==='gomi'){clipSfx(ctx,out,'pss',start+P.TF);clipSfx(ctx,out,'chin',start+P.TF+0.35);clipSfx(ctx,out,'wah',start+P.TS)}
+  else if(P.tier==='shobo'){clipSfx(ctx,out,'pss',start+P.TF);clipSfx(ctx,out,'wah',start+P.TS)}
+  else{clipSfx(ctx,out,'boom',start+P.TF);clipSfx(ctx,out,'clang',start+P.TS);if(P.top)clipSfx(ctx,out,P.th.sfx,start+P.TG)}
+  if(end>P.TSL){
+    if(P.tier==='gomi'){clipVoice(ctx,out,b,start+P.TSL+0.02,P.seg,0.62);clipSfx(ctx,out,'thud',start+P.TSL+0.45)}
+    else if(P.tier==='shobo'){clipVoice(ctx,out,b,start+P.TSL+0.02,P.seg,0.85);clipSfx(ctx,out,'whoosh',start+P.TSL)}
+    else{clipSfx(ctx,out,'whoosh',start+P.TSL);clipVoice(ctx,out,b,start+P.TSL+0.02,P.seg)}
+  }
+}
 async function recordClip(b,canvas,onProg){
   await fontsReady(b);
   const ctx=ac();try{await ctx.resume()}catch(e){}
@@ -2959,9 +3036,7 @@ async function recordClip(b,canvas,onProg){
   const running=ctx.state==='running',p0=performance.now(),start=ctx.currentTime+0.06;
   const now=()=>running?ctx.currentTime-start:(performance.now()-p0)/1000-0.06;
   if(running){
-    clipVoice(ctx,out,b,start+P.T0,null);clipSfx(ctx,out,'boom',start+P.TF);clipSfx(ctx,out,'clang',start+P.TS);
-    if(P.top)clipSfx(ctx,out,P.th.sfx,start+P.TG);
-    clipSfx(ctx,out,'whoosh',start+P.TSL);clipVoice(ctx,out,b,start+P.TSL+0.02,P.seg);
+    scheduleClipAudio(ctx,out,b,P,start);
   }
   await new Promise(res=>{(function tick(){const T=now();drawClipFrame(g,b,Math.max(0,T),P);onProg&&onProg(clamp(T/P.TEND,0,1));if(T<P.TEND)requestAnimationFrame(tick);else res()})()});
   rec.stop();await stopped;
