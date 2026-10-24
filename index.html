@@ -83,6 +83,8 @@ button:disabled{opacity:.5;cursor:default}
 .meter{flex:1 1 120px;height:10px;border-radius:5px;background:var(--well);border:1px solid var(--line);overflow:hidden;min-width:100px}
 .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember),var(--ember-hi))}
 input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex:1 1 160px;min-width:0}
+.sens{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted);margin-top:-6px}
+.sens select{font:inherit;font-size:13px;color:var(--steel);background:var(--well);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
 .pick{border:1px solid var(--line);border-radius:8px;background:var(--well);padding:10px 12px;display:grid;gap:8px}
 .pick p{margin:0;font-size:12px;color:var(--muted)}
 .pick-wave{position:relative;height:72px;border-radius:6px;overflow:hidden;background:#0b0806;cursor:pointer;touch-action:none}
@@ -249,6 +251,7 @@ dialog.share[open]{display:grid;gap:12px}
         <button class="shout" id="shoutBtn">押して叫ぶ</button>
         <div class="meter" aria-hidden="true"><i id="meter"></i></div>
       </div>
+      <div class="sens"><label for="sensSel">マイク感度</label><select id="sensSel"><option value="-6">低い</option><option value="0">標準</option><option value="8">高い</option><option value="16">とても高い</option><option value="24">最大</option></select><button class="link" id="reforgeBtn" hidden>今の声で鍛え直す</button></div>
       <p class="note" id="note" hidden></p>
       <div class="pick" id="pick" hidden>
         <p id="pickMsg">長い音なので、剣にする2秒を選ぶ。波形をタップかドラッグで動かせる。</p>
@@ -1321,7 +1324,7 @@ const dojoUnlocked=()=>dojo.best>=DOJO_N||dojo.cleared;
 function saveDojo(){try{localStorage.setItem('sakebi_dojo',JSON.stringify(dojo))}catch(e){}}
 
 /* ================= 声 → プロファイル ================= */
-function analyze(data,sr){
+function analyze(data,sr,boost=0){
   const frame=Math.max(64,Math.floor(sr*0.02)),n=Math.floor(data.length/frame);
   const rms=[],zcr=[];let peak=0;
   for(let i=0;i<n;i++){
@@ -1333,7 +1336,7 @@ function analyze(data,sr){
   // マイクの感度に左右されないよう、「叫び」と「周りの静けさ」の差で大きさを測る
   const db=v=>20*Math.log10(Math.max(1e-7,v)),sorted=[...rms].sort((x,y)=>x-y);
   const floorDb=Math.min(db(sorted[Math.floor(sorted.length*0.1)]),-38),snr=db(mx)-floorDb;
-  if(snr<12||mx<0.0015)return null;
+  if(snr+boost<12||mx<0.0015)return null;
   const thr=mx*0.12,a=rms.findIndex(r=>r>thr);
   let b=rms.length-1;while(b>a&&rms[b]<=thr)b--;
   const seg=rms.slice(a,b+1),zs=zcr.slice(a,b+1),N=40,env=[];
@@ -1342,7 +1345,8 @@ function analyze(data,sr){
   let d=0;for(let i=1;i<seg.length;i++)d+=Math.abs(seg[i]-seg[i-1])/mx;
   // 立ち上がりの鋭さ（40msでどれだけ一気に大きくなったか）
   let attack=0;for(let i=2;i<seg.length;i++)attack=Math.max(attack,(seg[i]-seg[i-2])/mx);
-  const loud=clamp01((snr-18)/32),roughRaw=clamp01(d/Math.max(1,seg.length)*4);
+  // boost：マイク感度の設定（dB）。スマホのマイクは叫びを控えめに拾うことがある
+  const loud=clamp01((snr+boost-18)/32),roughRaw=clamp01(d/Math.max(1,seg.length)*4);
   const pc=pitchContour(data,sr,frame,a,b,rms,thr);
   return{env,pitchHz:pc.median||wz/ws,rough:clamp01(Math.max(roughRaw*1.5,(attack-0.35)*0.9)),dur:seg.length*frame/sr,peak:loud,peakRaw:Math.min(1,peak),snr,attack,t0:a*frame/sr,t1:(b+1)*frame/sr,curve:pc.curve,vib:pc.vib,semis:pc.semis,vibRate:pc.rate,clarity:pc.clarity};
 }
@@ -2504,7 +2508,7 @@ shoutBtn.addEventListener('click',async()=>{
   rec.start();const t0=performance.now();
   await new Promise(res=>{(function tick(){
     an.getFloatTimeDomainData(buf);let m=0;for(const v of buf)m=Math.max(m,Math.abs(v));
-    $('#meter').style.width=Math.min(100,m*140)+'%';
+    $('#meter').style.width=Math.min(100,m*140*Math.pow(10,micBoost/20))+'%';
     if(FV&&m>0.15&&Math.random()<m)forge.sparks.emit((Math.random()-.5)*300,-100,40,Math.ceil(m*6),new THREE.Color(2,1,0.3),200*m,200*m);
     const left=2-(performance.now()-t0)/1000;
     shoutBtn.textContent=left>0?`叫べ！ ${left.toFixed(1)}`:'鍛造中…';
@@ -2517,13 +2521,31 @@ shoutBtn.addEventListener('click',async()=>{
   shoutBtn.disabled=false;shoutBtn.classList.remove('rec');shoutBtn.textContent='押して叫ぶ';
 });
 function micFail(){showNote(location.protocol==='https:'||location.hostname==='localhost'?'マイクを使えませんでした。ブラウザのマイクの許可をオンにしてから、もう一度押してください。「音声ファイルから鍛える」でも遊べます。':'この画面ではマイクが使えません。「音声ファイルから鍛える」でスマホのボイスメモなどを選んでください。')}
+/* --- マイク感度 --- */
+let micBoost=0,lastMic=null;try{const v=+localStorage.getItem('sakebi_sens');if([-6,0,8,16,24].includes(v))micBoost=v}catch(e){}
+$('#sensSel').value=String(micBoost);
+$('#sensSel').addEventListener('change',e=>{micBoost=+e.target.value;try{localStorage.setItem('sakebi_sens',String(micBoost))}catch(err){}
+  $('#reforgeBtn').hidden=!lastMic;showNote(lastMic?'感度を変えた。「今の声で鍛え直す」で、さっきの叫びを新しい感度で測り直せる。':'次に叫んだ剣から、新しい感度で測る。')});
+$('#reforgeBtn').addEventListener('click',()=>{
+  if(!lastMic)return;const old=lastMic.vid;
+  // さっきの叫びから作った剣は保管庫から外して、作り直す
+  if(old&&vault.some(x=>x.id===old)){const v=vault.find(x=>x.id===old);vault=vault.filter(x=>x.id!==old);if(v.hasVoice)IDB.del(old);if(freeFoe==='v:'+old)freeFoe=null;saveVault()}
+  $('#reforgeBtn').hidden=true;showNote('');forgeFromAudio(lastMic.audio,'マイクで鍛えた剣',lastMic.name);
+});
 function forgeFromAudio(audio,src,name){
-  const p=analyze(audio.getChannelData(0),audio.sampleRate);
+  const mic=src==='マイクで鍛えた剣';
+  if(mic)$('#reforgeBtn').hidden=true;
+  const p=analyze(audio.getChannelData(0),audio.sampleRate,mic?micBoost:0);
   if(!p){showNote(src==='マイクで鍛えた剣'?'声が小さすぎて剣になりませんでした。もっと大きく叫んでください。':'音が小さすぎるか、静かすぎて剣になりませんでした。別の部分か、別のファイルを試してください。');return}
   const voice={buffer:audio,t0:p.t0,t1:p.t1};
   setPlayer($('#wordIn').value.trim()||name||'名無し',p,src,voice);
-  playerVid=vaultAdd(player,'self',voice);renderVault();afterForge();
-  track(src==='マイクで鍛えた剣'?'forge/mic':'forge/file');track('title/'+titleOf(player).name);
+  playerVid=vaultAdd(player,'self',voice);renderVault();
+  if(mic){lastMic={audio,name:player.name,vid:playerVid};
+    // 声が小さく測られたときは、感度の設定を案内する（このときはタブを自動で切り替えない）
+    if(p.peak<0.35&&micBoost<24){showNote('声が小さめに測られた。スマホなどでマイクが控えめなときは、下の「マイク感度」を上げると、さっきの叫びで鍛え直せる。')}
+    else afterForge();
+  }else afterForge();
+  track(mic?'forge/mic':'forge/file');track('title/'+titleOf(player).name);track('sens/'+micBoost);
 }
 /* --- ファイルの音で鍛える：長いときは、剣にする2秒を選ぶ --- */
 const PICK_LEN=2;let pickSt=null;
