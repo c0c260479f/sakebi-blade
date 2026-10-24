@@ -2522,7 +2522,8 @@ shoutBtn.addEventListener('click',async()=>{
 });
 function micFail(){showNote(location.protocol==='https:'||location.hostname==='localhost'?'マイクを使えませんでした。ブラウザのマイクの許可をオンにしてから、もう一度押してください。「音声ファイルから鍛える」でも遊べます。':'この画面ではマイクが使えません。「音声ファイルから鍛える」でスマホのボイスメモなどを選んでください。')}
 /* --- マイク感度 --- */
-let micBoost=0,lastMic=null;try{const v=+localStorage.getItem('sakebi_sens');if([-6,0,8,16,24].includes(v))micBoost=v}catch(e){}
+// スマホのマイクは叫びを小さく拾いがちなので、スマホでは最初から「とても高い」にしておく
+let micBoost=matchMedia('(pointer:coarse)').matches?16:0,lastMic=null;try{const raw=localStorage.getItem('sakebi_sens'),v=+raw;if(raw!==null&&[-6,0,8,16,24].includes(v))micBoost=v}catch(e){}
 $('#sensSel').value=String(micBoost);
 $('#sensSel').addEventListener('change',e=>{micBoost=+e.target.value;try{localStorage.setItem('sakebi_sens',String(micBoost))}catch(err){}
   $('#reforgeBtn').hidden=!lastMic;showNote(lastMic?'感度を変えた。「今の声で鍛え直す」で、さっきの叫びを新しい感度で測り直せる。':'次に叫んだ剣から、新しい感度で測る。')});
