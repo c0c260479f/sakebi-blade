@@ -343,7 +343,7 @@ dialog.share[open]{display:grid;gap:12px}
       <div class="streak" id="streak"></div>
       <details class="more">
         <summary>遊び方</summary>
-        <p class="howto" id="howto">十人の剣士を順に倒す。負けたら叫び直して、同じ相手に何度でも挑める。開始前に舞台の左半分をタップすると<b>出撃位置</b>を決められる。舞台は時間とともに崩れて狭くなり、<b>場外に落ちたら負け</b>。斬られて折れた剣は短くなるが、軽くなって速くなる。押されている側の折れた剣は相手の懐へ飛び込み、<b>柄を打てば大ダメージ</b>。</p>
+        <p class="howto" id="howto">十人の剣士を順に倒す。負けたら叫び直して、同じ相手に何度でも挑める。開始前に舞台の左半分をタップすると<b>出撃位置</b>を決められる。縁に寄せるほど<b>背水の陣</b>で与えるダメージが増えるが、吹き飛ばされやすくなる。舞台は時間とともに崩れて狭くなり、<b>場外に落ちたら負け</b>。縁を越えても一度は<b>崖っぷち</b>でしがみつき、そこで斬られるか体力が少なければ落ちる。斬られて折れた剣は短くなるが、軽くなって速くなる。押されている側の折れた剣は相手の懐へ飛び込み、<b>柄を打てば大ダメージ</b>。</p>
       </details>
     </section>
   </div>
@@ -1412,12 +1412,12 @@ function synthProfile(seed,boost=0){
 /* 能力：威力・リーチ・速さ・重さ（どれかを上げると別のどれかが下がる） */
 const TRAITS={
   gou:{name:'剛剣',stat:'power',desc:'刃をへし折る。不動に強いが、大振りなので疾風にかわされやすい'},
-  naga:{name:'長刀',stat:'reach',desc:'斬撃が遠くまで届き、かわされない。速い剣ほど大きく吹き飛ばす。重い不動には押し負ける'},
-  kaze:{name:'疾風',stat:'speed',desc:'二段突きでよくかわし、剛剣の大振りを受け流す。剛剣に強いが、不動に弱い'},
+  naga:{name:'長刀',stat:'reach',desc:'斬撃が遠くまで届き、かわされない。速い剣ほど大きく吹き飛ばすので疾風に強い。重い不動には押し負ける'},
+  kaze:{name:'疾風',stat:'speed',desc:'二段突きでよくかわし、剛剣の大振りを受け流す。剛剣に強いが、不動と長刀に弱い'},
   fudo:{name:'不動',stat:'weight',desc:'吹き飛ばされず、軽い剣を場外へ叩き出す。疾風と長刀に強いが、剛剣に弱い'}
 };
 // 異能の相性（▶は「〜に強い」）。シミュレーターで勝率を確かめた関係だけを載せる
-const BEATS={gou:['fudo'],fudo:['kaze','naga'],kaze:['gou'],naga:[]};
+const BEATS={gou:['fudo'],fudo:['kaze','naga'],kaze:['gou'],naga:['kaze']};
 const TRAIT_HOW={gou:'大きく、荒く（だみ声で）叫ぶ → 威力80以上',naga:'長く伸ばして叫ぶ → リーチ80以上',kaze:'高い声で、軽めに叫ぶ → 速さ80以上',fudo:'低く太い声で、途切れずに大きく叫ぶ → 重さ80以上'};
 const STAT_HOW={power:'もっと大きく、荒く叫ぶと威力が上がる',reach:'もっと長く伸ばすとリーチが伸びる',speed:'高い声で軽めに叫ぶと速くなる',weight:'低く太い声で叫ぶと重くなり、吹き飛ばされにくい'};
 const TN=k=>TRAITS[k].name;
@@ -1892,6 +1892,11 @@ function updateForge(dt,time){
 /* ================= 浮遊舞台シーン ================= */
 let AV=null;
 const SC=0.72,R0=310,R_MIN=115,SHRINK_START=5,SHRINK_RATE=7,MAX_TIME=80;
+// 崖っぷち：縁を越えてもすぐには落ちず、一瞬しがみつく。その間に斬られるか、体力が少なければ落ちる
+const TEETER_T=0.75,TEETER_HP=25,TEETER_CD=0;
+// 背水の陣：縁の近くから出撃すると、与えるダメージが増えるかわりに吹き飛ばされやすい
+const HAISUI_DMG=0.35,HAISUI_KB=0.6;
+const haisuiOf=(x,z)=>clamp((Math.hypot(x,z)-140)/100,0,1);
 const arena={sparks:null,embers:null,hitLight:null,shake:0,camPos:null,camTarget:null,focus:null,shards:[],shardGeo:null,danger:null,edge:null,ringR:R0,marker:null,start:{x:-150,z:40},torches:[]};
 function initArena(){
   AV=makeView($('#arena'),()=>{if(!matchMedia('(max-width: 899px)').matches)return 640/392;const w=Math.min(innerWidth,900)-34,avail=innerHeight-445;return clamp(w/Math.max(180,avail),1.0,1.9)},[0.38,0.45,0.88]);
@@ -1941,7 +1946,7 @@ function makeFighter(b,x,z,facingSign){
   const sh=b.shape;
   const f={b,x,z,vx:0,vz:0,h:facingSign>0?0:Math.PI,y:40,hp:100,lenFrac:1,breaks:0,
     speedMul:1,cycleT:-0.8-Math.random()*0.4,curSeg:null,hitDone:false,tickCd:0,cool:0,orbit:Math.random()<.5?1:-1,spin:0,spinDir:1,
-    fall:false,fallV:0,dead:false,trail:[],glow:0};
+    fall:false,fallV:0,dead:false,trail:[],glow:0,teeterT:0,teeterCd:0,forceFall:false,haisui:0};
   f.gripLen=(sh.bs-sh.x0)*SC;f.baseSpeed=f.speedMul;f.halfW=sh.avgW*SC*0.5+4;
   updateReach(f);
   return f;
@@ -2072,12 +2077,15 @@ function tryHit(A,B){
     popup('回避',B.x,84,B.z,'w');if(AV)arena.sparks.emit(B.x,40,B.z,14,B.o?B.o.accent.clone().multiplyScalar(1.6):new THREE.Color(1,1,1),200,30);
     duel.stats.dodge=(duel.stats.dodge||0)+1;return;
   }
-  let dmg=5.3*(0.62+st.power*1.0)*inten*(1-0.25*B.b.st.weight)*(st.has('gou')&&B.b.st.has('fudo')?1.45:1)*(st.has('naga')?1+0.7*B.b.st.speed:1)*(sg.long?1.02:(A.second?0.45:1)*(A.b.segs.length>=3?0.78:1))*(tip?1.35:1)*(hilt?3.2:1)*(sg.long?1+0.4*Math.abs(ash.curve):1-0.15*Math.abs(ash.curve))*(1-(st.has('gou')?0.1:0.35)*B.b.st.weight);
+  let dmg=5.3*(0.62+st.power*1.0)*inten*(1-0.25*B.b.st.weight)*(1+HAISUI_DMG*A.haisui)*(st.has('gou')&&B.b.st.has('fudo')?1.45:1)*(st.has('naga')?1+0.7*B.b.st.speed:1)*(sg.long?1.02:(A.second?0.45:1)*(A.b.segs.length>=3?0.78:1))*(tip?1.35:1)*(hilt?3.2:1)*(sg.long?1+0.4*Math.abs(ash.curve):1-0.15*Math.abs(ash.curve))*(1-(st.has('gou')?0.1:0.35)*B.b.st.weight);
   dmg=Math.max(1,dmg);
   B.hp=Math.max(0,B.hp-dmg);
   if(ash.vib){B.bleed=1.5;B.bleedK=1.0*ash.vib}
   const nx=B.x-A.x,nz=B.z-A.z,n=Math.hypot(nx,nz)||1,ux=nx/n,uz=nz/n;
-  const kb=(150+330*st.power)*inten*Math.max(0.3,1.4-B.b.st.weight*1.0)*(sg.long?0.55:1)*(1+(1-B.hp/100)*0.6)*(0.55+Math.min(1,duel.time/20)*0.6)*(B.b.st.has('fudo')?0.75:1)*(st.has('fudo')?1+(1-B.b.st.weight)*0.9:1)*(st.has('naga')?1+B.b.st.speed*0.8:1);
+  const kb=(1+HAISUI_KB*B.haisui)*(st.has('gou')&&B.b.st.has('kaze')?0.65:1)*(150+330*st.power)*inten*Math.max(0.3,1.4-B.b.st.weight*1.0)*(sg.long?0.55:1)*(1+(1-B.hp/100)*0.6)*(0.55+Math.min(1,duel.time/20)*0.6)*(B.b.st.has('fudo')?0.75:1)*(st.has('fudo')?1+(1-B.b.st.weight)*0.9:1)*(st.has('naga')?1+B.b.st.speed*0.8:1);
+  // 崖っぷちで斬られたら、威力と重さの勝負で落ちるか踏ん張るかが決まる
+  if(B.teeterT>0){const pf=clamp(0.45+0.3*(Math.max(st.power,st.speed)-B.b.st.weight)+(B.hp<50?0.15:0)+0.2*(B.teeters-1),0.1,0.92)*(B.b.st.has('kaze')?(st.has('gou')?0.3:0.7):1);
+    if(Math.random()<pf){B.forceFall=true;B.teeterT=0;popup('落ちた！',B.x,110,B.z,'w')}else{popup('踏ん張った！',B.x,110,B.z,'w');B.teeterT=0;B.teeterCd=TEETER_CD;const r=Math.hypot(B.x,B.z)||1;B.vx=-B.x/r*340;B.vz=-B.z/r*340;B.x-=B.x/r*12;B.z-=B.z/r*12;return}}
   B.vx+=ux*kb;B.vz+=uz*kb;B.curSeg=null;B.cool=Math.max(B.cool,hilt?0.6:0.18);B.stun=hilt?0.6:0.32;
   if(hilt){B.cycleT=-0.5;duel.stats.hilt=(duel.stats.hilt||0)+1}
   if(sg.long)A.tickCd=0.24;else if(st.has('kaze')&&!A.second){A.second=true;A.tickCd=0.12;popup('疾風・二段',A.x,96,A.z,'w')}else{A.hitDone=true;A.vx*=0.25;A.vz*=0.25}
@@ -2134,6 +2142,8 @@ function drawFighter(f,dt,time){
   const turn=f.fall?0:clamp(angDiff(f.h,f.prevH??f.h)/Math.max(dt,1e-3)*0.03,-0.5,0.5);f.prevH=f.h;
   o.yaw.rotation.x=f.fall?o.yaw.rotation.x+dt*6:turn;
   if(f.fall)o.yaw.rotation.z+=dt*4;
+  // 崖っぷち：縁でぐらぐら揺れて、外側へ傾く
+  else if(f.teeterT>0){o.yaw.rotation.x=Math.sin(time*28)*0.22;o.pivot.position.y=f.y-10+Math.sin(time*19)*3}
   o.ghosts.forEach((g,k)=>{g.g.rotation.y=-(f.h-f.spinDir*(k+1)*0.22);g.m.material.opacity=long?0.24*(1-k/5):0});
   o.aura.material.opacity=0;o.aura.visible=false;
   o.bladeMat.emissiveIntensity=0.22+f.glow*0.8+(long?0.35:0);
@@ -2213,9 +2223,10 @@ function renderMatchup(){
   const m=matchup(player,cpu),V={adv:'有利',dis:'不利',even:'五分'};
   const mark=k=>`<b class="${player.st.traits.includes(k)?'me':''} ${cpu.st.traits.includes(k)?'cpu':''}">${TN(k)}</b>`;
   el.innerHTML=`<p><span class="v ${m.verdict}">${V[m.verdict]}</span>${esc(m.text)}</p>`+(m.tip?`<p class="tip">次の一手：${esc(m.tip)}</p>`:'')+
-    `<p class="chain">${mark('gou')} ▶ ${mark('fudo')} ▶ ${mark('kaze')} ▶ ${mark('gou')}　／　${mark('naga')}は不動に弱い　（▶は「〜に強い」）</p>`;
+    `<p class="chain">${mark('gou')} ▶ ${mark('fudo')} ▶ ${mark('kaze')} ▶ ${mark('gou')}　／　${mark('fudo')} ▶ ${mark('naga')} ▶ ${mark('kaze')}　（▶は「〜に強い」）</p>`;
 }
-function cpuStart(){const a=(Math.random()-0.5)*1.4,r=90+Math.random()*130;return{x:Math.cos(a)*r,z:Math.sin(a)*r}}
+// 相手は背水の陣を使わない（中央寄りから出る）
+function cpuStart(){const a=(Math.random()-0.5)*1.4,r=90+Math.random()*50;return{x:Math.cos(a)*r,z:Math.sin(a)*r}}
 function resetDuel(){
   if(!cpu)newCpu();
   if(duel&&AV)duel.f.forEach(removeFighterObj);
@@ -2224,7 +2235,7 @@ function resetDuel(){
   const cs=cpuStart();
   duel={f:[makeFighter(player,arena.start.x,arena.start.z,1),makeFighter(cpu,cs.x,cs.z,-1)],time:0,running:false,ending:0,hitStop:0,slow:1,result:null,dtStep:0,stats:{hit:0,clash:0}};
   if(AV){buildFighterObj(duel.f[0],EMBER);buildFighterObj(duel.f[1],CPUC);arena.marker.visible=true}
-  arena.focus=null;setBanner('出撃位置をタップで決める','hint');
+  arena.focus=null;setBanner('出撃位置をタップで決める','hint','縁に寄せるほど攻めに強く、落ちやすい');
   const lockDojo=mode==='dojo'&&dojo.cleared;
   $('#nextBtn').hidden=true;$('#retryBtn').hidden=true;$('#fightBtn').hidden=lockDojo;$('#resetBtn').hidden=!lockDojo;
   updateHud();
@@ -2258,9 +2269,21 @@ function stepDuel(dt){
     if(f.dead)continue;
     // 勝負が決まったあとは、勝った側が勢いで落ちないよう舞台の縁で止める
     if(f===winner&&!f.fall){const r=Math.hypot(f.x,f.z),R=arena.ringR-4;if(r>R){f.x*=R/r;f.z*=R/r;f.vx*=0.2;f.vz*=0.2}continue}
-    if(!f.fall&&duel.running&&Math.hypot(f.x,f.z)>arena.ringR+6){f.fall=true;f.fallV=0;f.curSeg=null;sfx('fall',f.x/R0,1);if(AV)arena.sparks.emit(f.x,0,f.z,40,new THREE.Color(2,0.8,0.2),260,60)}
+    if(f.teeterCd>0)f.teeterCd-=dt;
+    if(f.teeterT>0&&!f.fall){
+      // しがみついている間は縁に留まる（舞台が縮んでも縁についていく）
+      const r=Math.hypot(f.x,f.z)||1,R=arena.ringR+3;f.x*=R/r;f.z*=R/r;f.vx=0;f.vz=0;f.curSeg=null;f.cool=Math.max(f.cool,0.1);
+      f.teeterT-=dt;
+      if(f.teeterT<=0&&!f.forceFall){f.teeterCd=TEETER_CD;const ux=-f.x/R,uz=-f.z/R;f.vx=ux*300;f.vz=uz*300;f.x+=ux*10;f.z+=uz*10;popup('耐えた！',f.x,100,f.z,'w');}
+      if(!f.forceFall)continue;
+    }
+    if(!f.fall&&duel.running&&!duel.ending&&Math.hypot(f.x,f.z)>arena.ringR+6&&!f.forceFall&&f.hp>TEETER_HP&&f.teeterCd<=0&&f.teeterT<=0){
+      f.teeterT=TEETER_T;f.teeters=(f.teeters||0)+1;f.curSeg=null;popup('崖っぷち！',f.x,110,f.z,'w');sfx('clash',f.x/R0,0.5);if(!reduceMotion)duel.slow=0.45;continue;
+    }
+    if(!f.fall&&duel.running&&Math.hypot(f.x,f.z)>arena.ringR+(f.forceFall?0:6)){f.teeterT=0;f.fall=true;f.fallV=0;f.curSeg=null;sfx('fall',f.x/R0,1);if(AV)arena.sparks.emit(f.x,0,f.z,40,new THREE.Color(2,0.8,0.2),260,60)}
     if(f.fall){f.fallV-=900*dt;f.y+=f.fallV*dt;f.x+=f.vx*dt*0.6;f.z+=f.vz*dt*0.6}
   }
+  if(duel.running&&!duel.ending&&duel.slow<1&&!duel.f.some(g=>g.teeterT>0))duel.slow=1;
   if(duel.running&&!duel.ending){
     if(p.hp<=0||c.hp<=0)endDuel(c.hp<=0&&p.hp>0?true:p.hp<=0&&c.hp>0?false:p.hp>=c.hp,'破壊');
     else if(p.fall||c.fall)endDuel(p.fall&&c.fall?Math.hypot(p.x,p.z)<=Math.hypot(c.x,c.z):!p.fall,'場外');
@@ -2338,6 +2361,11 @@ function pickStart(ev){
   arena.start={x,z};
   const p=duel.f[0];p.x=x;p.z=z;p.h=Math.atan2(duel.f[1].z-z,duel.f[1].x-x);
   arena.sparks.emit(x,4,z,20,new THREE.Color(2,0.9,0.3),160,60);
+  const e=haisuiOf(x,z);
+  // 重い剣は縁、軽く速い剣は中央が向いている（シミュレーターで確かめた傾向）
+  const st=player.st,heavy=st.has('fudo')||st.has('gou')||st.show.weight>=60,light=st.has('kaze')||st.show.weight<=35;
+  const fit=heavy?'重い剣は背水の陣が向いている':light?'軽い剣は中央寄りが安全':'';
+  setBanner(e>0.3?'背水の陣':'中央寄り','hint',(e>0.3?`与えるダメージ +${Math.round(HAISUI_DMG*e*100)}%　吹き飛ばされやすさ +${Math.round(HAISUI_KB*e*100)}%`:'縁に寄せるほど攻めに強く、落ちやすくなる')+(fit?`<br>${fit}`:''));
 }
 $('#arena').addEventListener('pointerdown',pickStart);
 function startDuel(){
@@ -2346,7 +2374,8 @@ function startDuel(){
   const keepCpu=duel&&!duel.result&&!duel.running?{x:duel.f[1].x,z:duel.f[1].z}:null;
   resetDuel();arena.marker.visible=false;
   if(keepCpu){duel.f[1].x=keepCpu.x;duel.f[1].z=keepCpu.z}
-  for(const [f,o] of [[duel.f[0],duel.f[1]],[duel.f[1],duel.f[0]]]){f.pan=panNode();f.h=Math.atan2(o.z-f.z,o.x-f.x)}
+  for(const [f,o] of [[duel.f[0],duel.f[1]],[duel.f[1],duel.f[0]]]){f.pan=panNode();f.h=Math.atan2(o.z-f.z,o.x-f.x);f.haisui=haisuiOf(f.x,f.z)}
+  for(const f of duel.f)if(f.haisui>0.3)setTimeout(()=>{if(duel.running&&!duel.ending)popup('背水の陣',f.x,128,f.z,'w')},500);
   duel.running=true;$('#fightBtn').hidden=true;$('#retryBtn').hidden=true;
   setBanner('いざ！','go');setTimeout(()=>{if(duel.running&&!duel.ending)setBanner('','')},700);
   for(const f of duel.f)arena.sparks.emit(f.x,30,f.z,50,f.o.accent.clone().multiplyScalar(2),300,120);
