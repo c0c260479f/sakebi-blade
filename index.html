@@ -1947,7 +1947,8 @@ function makeFighter(b,x,z,facingSign){
   return f;
 }
 function updateReach(f){const sh=f.b.shape;f.reach=sh.L*f.lenFrac*SC;f.bodyR=Math.max(26,(f.reach+f.gripLen)*0.3)}
-function cycleLen(f){return clamp(0.55+f.b.p.dur*1.25,1.0,3.2)*(1.35-f.b.st.speed*0.7)/f.speedMul}
+// 威力の高い剣は大振りで、振りの間隔が少し長い
+function cycleLen(f){return clamp(0.55+f.b.p.dur*1.25,1.0,3.2)*(1.35-f.b.st.speed*0.7)*(0.85+0.35*f.b.st.power)/f.speedMul}
 function buildFighterObj(f,accent){
   const pivot=new THREE.Group(),yaw=new THREE.Group(),sword=swordMesh(f.b.shape,accent,ENV);
   sword.position.x=-f.b.shape.bs;const lay=new THREE.Group();lay.add(sword);lay.rotation.x=-Math.PI/2;lay.scale.setScalar(SC);
@@ -2071,12 +2072,12 @@ function tryHit(A,B){
     popup('回避',B.x,84,B.z,'w');if(AV)arena.sparks.emit(B.x,40,B.z,14,B.o?B.o.accent.clone().multiplyScalar(1.6):new THREE.Color(1,1,1),200,30);
     duel.stats.dodge=(duel.stats.dodge||0)+1;return;
   }
-  let dmg=5.3*(0.45+st.power*1.3)*inten*(st.has('gou')&&B.b.st.has('fudo')?1.45:1)*(st.has('naga')?1+0.7*B.b.st.speed:1)*(sg.long?1.02:(A.second?0.45:1)*(A.b.segs.length>=3?0.78:1))*(tip?1.35:1)*(hilt?3.2:1)*(sg.long?1+0.4*Math.abs(ash.curve):1-0.15*Math.abs(ash.curve))*(1-(st.has('gou')?0.1:0.35)*B.b.st.weight);
+  let dmg=5.3*(0.62+st.power*1.0)*inten*(1-0.25*B.b.st.weight)*(st.has('gou')&&B.b.st.has('fudo')?1.45:1)*(st.has('naga')?1+0.7*B.b.st.speed:1)*(sg.long?1.02:(A.second?0.45:1)*(A.b.segs.length>=3?0.78:1))*(tip?1.35:1)*(hilt?3.2:1)*(sg.long?1+0.4*Math.abs(ash.curve):1-0.15*Math.abs(ash.curve))*(1-(st.has('gou')?0.1:0.35)*B.b.st.weight);
   dmg=Math.max(1,dmg);
   B.hp=Math.max(0,B.hp-dmg);
   if(ash.vib){B.bleed=1.5;B.bleedK=1.0*ash.vib}
   const nx=B.x-A.x,nz=B.z-A.z,n=Math.hypot(nx,nz)||1,ux=nx/n,uz=nz/n;
-  const kb=(110+400*st.power)*inten*Math.max(0.3,1.4-B.b.st.weight*1.0)*(sg.long?0.55:1)*(1+(1-B.hp/100)*0.6)*(0.55+Math.min(1,duel.time/20)*0.6)*(B.b.st.has('fudo')?0.75:1)*(st.has('fudo')?1+(1-B.b.st.weight)*0.9:1)*(st.has('naga')?1+B.b.st.speed*0.8:1);
+  const kb=(150+330*st.power)*inten*Math.max(0.3,1.4-B.b.st.weight*1.0)*(sg.long?0.55:1)*(1+(1-B.hp/100)*0.6)*(0.55+Math.min(1,duel.time/20)*0.6)*(B.b.st.has('fudo')?0.75:1)*(st.has('fudo')?1+(1-B.b.st.weight)*0.9:1)*(st.has('naga')?1+B.b.st.speed*0.8:1);
   B.vx+=ux*kb;B.vz+=uz*kb;B.curSeg=null;B.cool=Math.max(B.cool,hilt?0.6:0.18);B.stun=hilt?0.6:0.32;
   if(hilt){B.cycleT=-0.5;duel.stats.hilt=(duel.stats.hilt||0)+1}
   if(sg.long)A.tickCd=0.24;else if(st.has('kaze')&&!A.second){A.second=true;A.tickCd=0.12;popup('疾風・二段',A.x,96,A.z,'w')}else{A.hitDone=true;A.vx*=0.25;A.vz*=0.25}
@@ -2252,14 +2253,17 @@ function stepDuel(dt){
   }
   if(duel.running){think(p,c,dt);think(c,p,dt)}
   interact(p,c);
+  const winner=duel.ending&&duel.result?(duel.result.pWin?p:c):null;
   for(const f of duel.f){
     if(f.dead)continue;
+    // 勝負が決まったあとは、勝った側が勢いで落ちないよう舞台の縁で止める
+    if(f===winner&&!f.fall){const r=Math.hypot(f.x,f.z),R=arena.ringR-4;if(r>R){f.x*=R/r;f.z*=R/r;f.vx*=0.2;f.vz*=0.2}continue}
     if(!f.fall&&duel.running&&Math.hypot(f.x,f.z)>arena.ringR+6){f.fall=true;f.fallV=0;f.curSeg=null;sfx('fall',f.x/R0,1);if(AV)arena.sparks.emit(f.x,0,f.z,40,new THREE.Color(2,0.8,0.2),260,60)}
     if(f.fall){f.fallV-=900*dt;f.y+=f.fallV*dt;f.x+=f.vx*dt*0.6;f.z+=f.vz*dt*0.6}
   }
   if(duel.running&&!duel.ending){
     if(p.hp<=0||c.hp<=0)endDuel(c.hp<=0&&p.hp>0?true:p.hp<=0&&c.hp>0?false:p.hp>=c.hp,'破壊');
-    else if(p.fall||c.fall)endDuel(!p.fall,'場外');
+    else if(p.fall||c.fall)endDuel(p.fall&&c.fall?Math.hypot(p.x,p.z)<=Math.hypot(c.x,c.z):!p.fall,'場外');
     else if(duel.time>MAX_TIME)endDuel(Math.hypot(p.x,p.z)<=Math.hypot(c.x,c.z),'判定');
   }
 }
