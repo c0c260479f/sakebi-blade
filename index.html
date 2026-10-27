@@ -172,6 +172,18 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .foe-name small{font-family:var(--f-data);font-size:12px;color:var(--muted);margin-right:8px}
 .foe-name span{color:var(--cpu)}
 .foe-hint{margin:0;font-size:13px;color:var(--muted)}
+.mu{display:grid;gap:4px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-size:13px}
+.mu:empty{display:none}
+.mu p{margin:0}
+.mu .v{display:inline-block;font-weight:700;font-size:12px;border-radius:4px;padding:0 7px;margin-right:6px}
+.mu .v.adv{background:var(--ember);color:var(--well)}.mu .v.dis{background:var(--cpu);color:var(--well)}.mu .v.even{background:var(--line);color:var(--steel)}
+.mu .chain{font-family:var(--f-data);font-size:12px;color:var(--muted)}
+.mu .chain b{font-weight:700;color:var(--steel)}.mu .chain b.me{color:var(--ember-hi)}.mu .chain b.cpu{color:var(--cpu)}.mu .chain b.me.cpu{text-decoration:underline}
+.mu .tip{color:var(--ember-hi)}
+button.chip{cursor:pointer;font:inherit;font-size:12px}
+button.chip[aria-expanded="true"]{background:var(--ember);color:var(--well)}
+.chip-info{margin:-6px 0 0;font-size:12px;color:var(--steel);background:var(--well);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.chip-info b{color:var(--ember-hi)}
 .modes{display:flex;gap:6px}
 .modes button{flex:1;padding:6px 10px;font-size:14px;justify-content:center}
 .modes button[aria-pressed="true"]{background:var(--ember);color:var(--well);border-color:var(--ember);font-weight:700}
@@ -271,6 +283,7 @@ dialog.share[open]{display:grid;gap:12px}
       </div>
       <p class="title-line" id="titleLine"></p>
       <div class="chips" id="chips"></div>
+      <p class="chip-info" id="chipInfo" hidden></p>
       <div class="stats" id="stats"></div>
       <button class="boast" id="boastBtn">この剣を自慢する</button>
       <details class="more">
@@ -297,7 +310,7 @@ dialog.share[open]{display:grid;gap:12px}
     <section class="panel tp" id="pArena" aria-labelledby="arena-h">
       <div class="label"><span id="arena-h">道場破り</span><span id="lvTag">其の一</span></div>
       <div class="modes" role="group" aria-label="対戦の形式"><button id="modeDojo" aria-pressed="true">道場破り</button><button id="modeFree" aria-pressed="false">自由対戦</button></div>
-      <div class="foe" id="foe"><div class="pips" id="pips"></div><div class="foe-pick" id="foePick" hidden><label for="foeSel">相手</label><select id="foeSel"></select></div><p class="foe-name" id="foeName"></p><p class="foe-hint" id="foeHint"></p></div>
+      <div class="foe" id="foe"><div class="pips" id="pips"></div><div class="foe-pick" id="foePick" hidden><label for="foeSel">相手</label><select id="foeSel"></select></div><p class="foe-name" id="foeName"></p><p class="foe-hint" id="foeHint"></p><div class="mu" id="matchup"></div></div>
       <div class="vs">
         <div class="side"><div class="nm" id="pName">あなた</div><div class="hp"><i id="pHp"></i></div><div class="sp" id="pSp">—</div></div>
         <div class="mid"><b id="timer">0</b>舞台 <span id="ringPct">100</span>%</div>
@@ -1399,10 +1412,33 @@ function synthProfile(seed,boost=0){
 /* 能力：威力・リーチ・速さ・重さ（どれかを上げると別のどれかが下がる） */
 const TRAITS={
   gou:{name:'剛剣',stat:'power',desc:'刃をへし折る。不動に強いが、大振りなので疾風にかわされやすい'},
-  naga:{name:'長刀',stat:'reach',desc:'斬撃が遠くまで届き、かわされない。速い剣ほど大きく吹き飛ばす'},
-  kaze:{name:'疾風',stat:'speed',desc:'二段突きでよくかわす。剛剣と長刀に強いが、不動に弱い'},
-  fudo:{name:'不動',stat:'weight',desc:'吹き飛ばされず、軽い剣を場外へ叩き出す。剛剣に弱い'}
+  naga:{name:'長刀',stat:'reach',desc:'斬撃が遠くまで届き、かわされない。速い剣ほど大きく吹き飛ばす。重い不動には押し負ける'},
+  kaze:{name:'疾風',stat:'speed',desc:'二段突きでよくかわし、剛剣の大振りを受け流す。剛剣に強いが、不動に弱い'},
+  fudo:{name:'不動',stat:'weight',desc:'吹き飛ばされず、軽い剣を場外へ叩き出す。疾風と長刀に強いが、剛剣に弱い'}
 };
+// 異能の相性（▶は「〜に強い」）。シミュレーターで勝率を確かめた関係だけを載せる
+const BEATS={gou:['fudo'],fudo:['kaze','naga'],kaze:['gou'],naga:[]};
+const TRAIT_HOW={gou:'大きく、荒く（だみ声で）叫ぶ → 威力80以上',naga:'長く伸ばして叫ぶ → リーチ80以上',kaze:'高い声で、軽めに叫ぶ → 速さ80以上',fudo:'低く太い声で、途切れずに大きく叫ぶ → 重さ80以上'};
+const STAT_HOW={power:'もっと大きく、荒く叫ぶと威力が上がる',reach:'もっと長く伸ばすとリーチが伸びる',speed:'高い声で軽めに叫ぶと速くなる',weight:'低く太い声で叫ぶと重くなり、吹き飛ばされにくい'};
+const TN=k=>TRAITS[k].name;
+function counterOf(k){return Object.keys(BEATS).filter(x=>BEATS[x].includes(k))}
+// 自分と相手の異能から、有利・不利と、次の叫び方のヒントを出す
+function matchup(me,foe){
+  const a=me.st.traits,b=foe.st.traits,adv=[],dis=[];
+  for(const x of a)for(const y of b){if(BEATS[x].includes(y))adv.push([x,y]);if(BEATS[y].includes(x))dis.push([y,x])}
+  let verdict='even',text;
+  if(adv.length>dis.length){verdict='adv';text=`あなたの${TN(adv[0][0])}は、相手の${TN(adv[0][1])}に強い`}
+  else if(dis.length>adv.length){verdict='dis';text=`相手の${TN(dis[0][0])}は、あなたの${TN(dis[0][1])}に強い`}
+  else if(a.length||b.length)text=a.length&&b.length?'異能の相性は五分':b.length?`相手は${b.map(k=>'異能・'+TN(k)).join('と')}を持っている`:`あなたの${a.map(TN).join('・')}が効く相手ではない`;
+  else text='どちらも異能なし。能力の差の勝負';
+  let tip='';
+  if(verdict!=='adv'){
+    const c=b.flatMap(counterOf).filter(k=>!a.includes(k));
+    if(c.length){const k=c[0];tip=`相手の${b.find(y=>BEATS[k].includes(y))?TN(b.find(y=>BEATS[k].includes(y))):''}には${TN(k)}が強い。${TRAIT_HOW[k]}`}
+    else{let best=null,gap=0;for(const k of STAT_KEYS){const d=foe.st.show[k]-me.st.show[k];if(d>gap){gap=d;best=k}}if(best&&gap>=10)tip=STAT_HOW[best]}
+  }
+  return{verdict,text,tip};
+}
 const PITCH_LO=110,PITCH_HI=900;
 function statsOf(p,bonus=0){
   const lenRaw=clamp01((p.dur-0.15)/1.6),mean=p.env.reduce((a,b)=>a+b,0)/p.env.length;
@@ -2029,7 +2065,7 @@ function tryHit(A,B){
   const rB=-B.gripLen*0.8+c.t*(B.reach+B.gripLen*0.8),hilt=A.breaks>0&&A.hp<B.hp&&rB<0;
   // 軽い剣は、構えていない時に身をかわすことがある
   const canDodge=!st.has('fudo')&&!st.has('naga');
-  if(canDodge&&!B.curSeg&&B.cool<=0&&Math.random()<0.5*B.b.st.speed*B.speedMul-0.12+(B.b.st.has('kaze')?0.06:0)+(st.has('gou')?0.3:0)){
+  if(canDodge&&!B.curSeg&&B.cool<=0&&Math.random()<0.5*B.b.st.speed*B.speedMul-0.12+(B.b.st.has('kaze')?0.06+(st.has('gou')?0.2:0):0)+(st.has('gou')?0.3:0)){
     const px=-Math.sin(A.h),pz=Math.cos(A.h),sd=(px*B.x+pz*B.z)>0?-1:1,dv=380+300*B.b.st.speed;
     B.vx+=px*sd*dv;B.vz+=pz*sd*dv;B.cool=0.25;A.hitDone=true;if(A.curSeg.long)A.tickCd=0.3;
     popup('回避',B.x,84,B.z,'w');if(AV)arena.sparks.emit(B.x,40,B.z,14,B.o?B.o.accent.clone().multiplyScalar(1.6):new THREE.Color(1,1,1),200,30);
@@ -2052,7 +2088,7 @@ function tryHit(A,B){
   sfx('hit',hx/R0,big?1.2:0.8);
   duel.stats.hit++;
   const th=[70,42,18];
-  if(st.has('gou')&&B.breaks<3&&B.hp>0&&(tip||B.b.st.has('fudo')||Math.random()<0.2)){breakBlade(B);popup('剛剣！ へし折った',B.x,110,B.z,'w');sfx('break',B.x/R0,1.2);shards(B.x,40,B.z,B,16)}
+  if(st.has('gou')&&B.breaks<3&&B.hp>0&&(B.b.st.has('kaze')?tip&&Math.random()<0.5:(tip||B.b.st.has('fudo')||Math.random()<0.2))){breakBlade(B);popup('剛剣！ へし折った',B.x,110,B.z,'w');sfx('break',B.x/R0,1.2);shards(B.x,40,B.z,B,16)}
   else if(B.breaks<th.length&&B.hp<=th[B.breaks]){breakBlade(B);const tx=B.x+Math.cos(B.h)*B.reach,tz=B.z+Math.sin(B.h)*B.reach;shards(tx,hy,tz,B,18);sfx('break',tx/R0,1);popup('折れた！ 身軽に',B.x,hy+70,B.z,'w')}
 }
 
@@ -2164,11 +2200,19 @@ function renderFoe(){
   $('#pips').innerHTML=DOJO.map((x,k)=>`<button type="button" data-i="${k}" class="${k<dojo.idx||dojo.cleared?'done':k===i?'now':''}" ${pick?`title="其の${NUM[k]} ${x.title}と戦う" aria-label="其の${NUM[k]} ${x.title}と戦う"`:'disabled tabindex="-1" aria-hidden="true"'}>${pick?NUM[k]:''}</button>`).join('');
   if(mode==='free'&&cpu){
     $('#foeName').innerHTML=`<small>${esc(cpu.title||'相手')}</small>「<span>${esc(cpu.name)}</span>」`;
-    $('#foeHint').textContent=cpu.hint||'';$('#lvTag').textContent='自由対戦';renderFoeSel();return;
+    $('#foeHint').textContent=cpu.hint||'';$('#lvTag').textContent='自由対戦';renderFoeSel();renderMatchup();return;
   }
   $('#foeName').innerHTML=dojo.cleared?'<small>道場制覇</small>全員を倒した':`<small>其の${NUM[i]}</small>${d.title}「<span>${d.word}</span>」`;
   $('#foeHint').textContent=dojo.cleared?'上の数字を押すと、その剣士と自由対戦できる。「最初から挑む」で、別の叫びでもう一度。':d.hint+(dojoUnlocked()?'（上の数字を押すと自由対戦）':'');
   $('#lvTag').textContent=dojo.cleared?'制覇':`其の${NUM[i]} / 十`;
+  renderMatchup();
+}
+function renderMatchup(){
+  const el=$('#matchup');if(!player||!cpu||(mode!=='free'&&dojo.cleared)){el.innerHTML='';return}
+  const m=matchup(player,cpu),V={adv:'有利',dis:'不利',even:'五分'};
+  const mark=k=>`<b class="${player.st.traits.includes(k)?'me':''} ${cpu.st.traits.includes(k)?'cpu':''}">${TN(k)}</b>`;
+  el.innerHTML=`<p><span class="v ${m.verdict}">${V[m.verdict]}</span>${esc(m.text)}</p>`+(m.tip?`<p class="tip">次の一手：${esc(m.tip)}</p>`:'')+
+    `<p class="chain">${mark('gou')} ▶ ${mark('fudo')} ▶ ${mark('kaze')} ▶ ${mark('gou')}　／　${mark('naga')}は不動に弱い　（▶は「〜に強い」）</p>`;
 }
 function cpuStart(){const a=(Math.random()-0.5)*1.4,r=90+Math.random()*130;return{x:Math.cos(a)*r,z:Math.sin(a)*r}}
 function resetDuel(){
@@ -2246,7 +2290,7 @@ function finishDuel(){
     if(dojo.idx>=DOJO.length){if(!dojo.cleared)track('dojo/clear');dojo.cleared=true;dojo.idx=DOJO.length;setBanner('道場制覇！','win',`挑戦 ${dojo.tries}回で十人抜き`);$('#nextBtn').hidden=true;$('#resetBtn').hidden=false}
     else{setBanner('勝利！','win',how);$('#nextBtn').hidden=false;$('#resetBtn').hidden=true}
     $('#fightBtn').hidden=true;$('#retryBtn').hidden=true;}
-  else{setBanner('敗北…','lose',how+'　叫び直して、もう一度');
+  else{const mt=cpu?matchup(player,cpu):null;setBanner('敗北…','lose',how+(mt&&mt.tip?'　次は：'+mt.tip:'　叫び直して、もう一度'));
     $('#retryBtn').hidden=false;$('#fightBtn').hidden=false;$('#fightBtn').textContent='同じ剣で再戦';$('#nextBtn').hidden=true;$('#resetBtn').hidden=true;}
   saveDojo();renderFoe();
   updateHud();
@@ -2476,12 +2520,23 @@ function renderForgeInfo(){
   const tt=titleOf(player);$('#titleLine').innerHTML=`<b${tt.top?` class="top ${tt.theme}"`:tt.tier?` class="${tt.tier}"`:''}>${esc(tt.name)}</b>${tt.rare?`<em class="rare${tt.top?` top ${tt.theme}`:tt.tier?` ${tt.tier}`:''}">${tt.rare}</em>`:''}${esc(tt.line)}`;
   const tags=shapeTags(player.shape);
   const tr=player.st.traits;
-  $('#chips').innerHTML=[...tr.map(k=>`<span class="chip tr" title="${TRAITS[k].desc}">異能・${TRAITS[k].name}</span>`),...tags.map(t=>`<span class="chip" title="${t.desc}">${t.name}</span>`)].join('');
+  $('#chips').innerHTML=[...tr.map(k=>`<button type="button" class="chip tr" data-info="t:${k}" aria-expanded="false">異能・${TRAITS[k].name}</button>`),...tags.map(t=>`<button type="button" class="chip" data-info="s:${t.k}" aria-expanded="false">${t.name}</button>`)].join('');
+  $('#chipInfo').hidden=true;
   $('#shapes').innerHTML=tags.length?tags.map(t=>`<span class="tag"><b>${t.name}</b>${t.desc}</span>`).join(''):'<span class="none">形の特徴なし。語尾を上げ下げする・3回以上区切る・声を震わせる・澄んだ声で叫ぶと、形が変わる。</span>';
   $('#traits').innerHTML=tr.length?tr.map(k=>`<div class="trait"><b>異能・${TRAITS[k].name}</b><span>${TRAITS[k].desc}</span></div>`).join(''):'<div class="none">どれかの能力が80を超えると「異能」に目覚める。</div>';
   $('#typeHelp').textContent=longs&&longs===n?'伸ばした声は回転しながら薙ぎ払う。何度も当たるが一撃は軽い':longs?'伸ばした部分で薙ぎ払い、区切った部分で突く':n>1?'区切った声の数だけ鋭く突進する':'一声で一度、鋭く突進する';
   $('#cycleTag').textContent=`1周 ${cycleLen({b:player,speedMul:1}).toFixed(1)}秒`;
 }
+$('#chips').addEventListener('click',e=>{
+  const bt=e.target.closest('button.chip');if(!bt)return;const open=bt.getAttribute('aria-expanded')==='true',info=$('#chipInfo');
+  $('#chips').querySelectorAll('button.chip').forEach(x=>x.setAttribute('aria-expanded','false'));
+  if(open){info.hidden=true;return}
+  bt.setAttribute('aria-expanded','true');const [kind,k]=bt.dataset.info.split(':');
+  if(kind==='t'){const strong=BEATS[k].map(TN),weak=counterOf(k).map(TN);
+    info.innerHTML=`<b>異能・${TN(k)}</b>　${esc(TRAITS[k].desc)}<br>${strong.length?`強い相手：${strong.join('・')}　`:''}${weak.length?`弱い相手：${weak.join('・')}`:''}<br>なり方：${esc(TRAIT_HOW[k])}`}
+  else{const t=shapeTags(player.shape).find(x=>x.k===k);info.innerHTML=t?`<b>${esc(t.name)}</b>　${esc(t.desc)}`:''}
+  info.hidden=false;
+});
 function setPlayer(name,p,src,voice=null){
   setPlayerBlade(makeBlade(name||'名無し',p,0,'',voice),src);
 }
@@ -2489,7 +2544,7 @@ function setPlayerBlade(b,src){
   player=b;
   $('#srcTag').textContent=src;
   renderForgeInfo();setForgeSword();
-  $('#fightBtn').textContent='決闘開始';resetDuel();
+  $('#fightBtn').textContent='決闘開始';resetDuel();renderMatchup();
 }
 function showNote(t){const n=$('#note');n.textContent=t;n.hidden=!t}
 
