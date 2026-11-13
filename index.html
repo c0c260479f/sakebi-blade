@@ -90,6 +90,12 @@ input[type=text]{font:inherit;background:var(--well);color:var(--steel);border:1
 .pick-wave{position:relative;height:72px;border-radius:6px;overflow:hidden;background:#0b0806;cursor:pointer;touch-action:none}
 .pick-wave canvas{width:100%;height:100%;display:block}
 .pick-win{position:absolute;top:0;bottom:0;border:2px solid var(--ember);border-radius:4px;background:rgba(255,138,42,.18);box-shadow:0 0 12px rgba(255,138,42,.4);pointer-events:none}
+.seg-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.seg-row>span{min-width:4.5em}
+.segs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.segs button{font:inherit;font-size:13px;padding:5px 12px;background:transparent;color:var(--steel);border:0;border-right:1px solid var(--line);cursor:pointer}
+.segs button:last-child{border-right:0}
+.segs button[aria-pressed="true"]{background:var(--ember);color:var(--well);font-weight:700}
 .pick .pri{background:var(--ember);color:var(--well);border-color:var(--ember);font-weight:700}
 .alt{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12px;color:var(--muted)}
 .alt input{display:none}
@@ -265,6 +271,12 @@ dialog.share[open]{display:grid;gap:12px}
       </div>
       <div class="sens"><label for="sensSel">マイク感度</label><select id="sensSel"><option value="-6">低い</option><option value="0">標準</option><option value="8">高い</option><option value="16">とても高い</option><option value="24">最大</option></select><button class="link" id="reforgeBtn" hidden>今の声で鍛え直す</button></div>
       <p class="note" id="note" hidden></p>
+      <div class="pick" id="tts" hidden>
+        <p>名前欄の言葉を、合成の声が代わりに叫ぶ。「！」で区切ると突き、「ー」で伸ばすと薙ぎ払いになる。</p>
+        <div class="seg-row"><span>声の高さ</span><div class="segs" data-k="pitch" role="group" aria-label="声の高さ"><button data-v="low" aria-pressed="false">低い</button><button data-v="mid" aria-pressed="true">ふつう</button><button data-v="high" aria-pressed="false">高い</button></div></div>
+        <div class="seg-row"><span>勢い</span><div class="segs" data-k="force" role="group" aria-label="勢い"><button data-v="soft" aria-pressed="false">ささやき</button><button data-v="mid" aria-pressed="true">ふつう</button><button data-v="max" aria-pressed="false">全力</button></div></div>
+        <div class="row"><button class="small" id="ttsPlay">聞いてみる</button><button class="small pri" id="ttsGo">この声で鍛える</button><button class="link" id="ttsCancel">やめる</button></div>
+      </div>
       <div class="pick" id="pick" hidden>
         <p id="pickMsg">長い音なので、剣にする2秒を選ぶ。波形をタップかドラッグで動かせる。</p>
         <div class="pick-wave" id="pickWave"><canvas id="pickCv" width="640" height="72" aria-hidden="true"></canvas><div class="pick-win" id="pickWin"></div></div>
@@ -274,7 +286,7 @@ dialog.share[open]{display:grid;gap:12px}
         <span>録音は端末の外に送られない。叫べない場所では</span>
         <input type="file" id="fileIn" accept="audio/*,video/*">
         <label for="fileIn">音声・動画ファイルで鍛える</label>
-        <button class="link" id="sampleBtn">サンプルで試す</button>
+        <button class="link" id="sampleBtn">文字で叫ばせる</button>
       </div>
       <div class="stage"><canvas id="forge" width="720" height="300" aria-label="鍛えた剣"></canvas></div>
       <div class="sword-head">
@@ -2634,7 +2646,7 @@ function forgeFromAudio(audio,src,name){
     if(p.peak<0.35&&micBoost<24){showNote('声が小さめに測られた。スマホなどでマイクが控えめなときは、下の「マイク感度」を上げると、さっきの叫びで鍛え直せる。')}
     else afterForge();
   }else afterForge();
-  track(mic?'forge/mic':'forge/file');track('title/'+titleOf(player).name);track('sens/'+micBoost);
+  if(src!=='合成の声で鍛えた剣')track(mic?'forge/mic':'forge/file');track('title/'+titleOf(player).name);track('sens/'+micBoost);
 }
 /* --- ファイルの音で鍛える：長いときは、剣にする2秒を選ぶ --- */
 const PICK_LEN=2;let pickSt=null;
@@ -2682,13 +2694,27 @@ $('#fileIn').addEventListener('change',async e=>{
   if(audio.duration>PICK_LEN+0.6)openPick(audio,name);
   else forgeFromAudio(monoSlice(audio,0,audio.duration),'ファイルから鍛えた剣',name);
 });
-$('#sampleBtn').addEventListener('click',()=>{
-  ac();
-  const w=$('#wordIn').value.trim()||['うおおお','ラーメン','はっ！はっ！','ヤッホー'][Math.floor(Math.random()*4)];
-  setPlayer(w,synthProfile(hashStr(w)^Math.floor(Math.random()*1e9)),'サンプルの剣');
-  playerVid=vaultAdd(player,'self',null);renderVault();afterForge();
-  track('forge/sample');
-});
+/* --- 文字で叫ばせる：合成の声に叫ばせ、その音を解析して剣にする（声を出せない場所向け） --- */
+const TTS_PITCH={low:{f0:110,size:1.32},mid:{f0:200,size:1.15},high:{f0:380,size:0.92}};
+const TTS_FORCE={soft:{gain:0.1,breath:0.6,growl:0},mid:{gain:0.28,breath:0.35,growl:0.08},max:{gain:0.6,breath:0.2,growl:0.6}};
+const ttsSel={pitch:'mid',force:'mid'};let ttsSrc=null;
+function ttsDur(mora){const w=mora.reduce((a,m)=>a+(m.ext?0.9:1)+(m.pause?0.5:0)+(m.gem?0.35:0),0);return clamp(0.22*w,0.3,1.9)}
+async function synthShout(text,sel){
+  const mora=parseMora(text);if(!mora.length)return null;
+  const sr=44100,dur=ttsDur(mora),oc=new OfflineAudioContext(1,Math.ceil(sr*(dur+0.7)),sr),P=TTS_PITCH[sel.pitch],F=TTS_FORCE[sel.force];
+  shout(oc,oc.destination,0.3,mora,dur,{f0:P.f0,size:P.size,breath:F.breath,growl:F.growl,vib:0,fall:0.12},{gain:F.gain});
+  const buf=await oc.startRendering(),d=buf.getChannelData(0);
+  // 部屋の静かな雑音を足す（マイクの録音と同じ物差しで、声の大きさを測るため）
+  for(let i=0;i<d.length;i++)d[i]+=(Math.random()*2-1)*0.004;
+  return buf;
+}
+function ttsText(){const w=$('#wordIn').value.trim();if(!w||!parseMora(w).length){showNote('名前欄に、ひらがなかカタカナで叫ぶ言葉を入れてね（例：はっ！はっ！、うおおおー）');$('#wordIn').focus();return null}return w}
+$('#sampleBtn').addEventListener('click',()=>{ac();closePick();showNote('');const box=$('#tts');box.hidden=!box.hidden;if(!box.hidden)box.scrollIntoView({block:'nearest',behavior:'smooth'})});
+$('#tts').addEventListener('click',e=>{const b=e.target.closest('.segs button');if(!b)return;const g=b.parentElement;g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));ttsSel[g.dataset.k]=b.dataset.v});
+$('#ttsPlay').addEventListener('click',async()=>{const w=ttsText();if(!w)return;const c=ac(),buf=await synthShout(w,ttsSel);if(!buf)return;if(ttsSrc)try{ttsSrc.stop()}catch(e){}ttsSrc=c.createBufferSource();ttsSrc.buffer=buf;ttsSrc.connect(voiceBus);ttsSrc.start()});
+$('#ttsGo').addEventListener('click',async()=>{const w=ttsText();if(!w)return;ac();const buf=await synthShout(w,ttsSel);if(!buf)return;$('#tts').hidden=true;
+  forgeFromAudio(buf,'合成の声で鍛えた剣',w);track('forge/text');track(`text/${ttsSel.pitch}-${ttsSel.force}`)});
+$('#ttsCancel').addEventListener('click',()=>{$('#tts').hidden=true});
 /* ================= 自慢：画像と動画 ================= */
 const SITE='c0c260479f.github.io/sakebi-blade';
 const FD='"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif',FB='"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif',FM='"M PLUS 1 Code",ui-monospace,monospace';
