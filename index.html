@@ -3181,7 +3181,67 @@ async function recordClip(b,canvas,onProg){
   rec.stop();await stopped;
   vs.getTracks().forEach(t=>t.stop());try{out.disconnect();lim.disconnect();mon.disconnect()}catch(e){}
   const full=rec.mimeType||mime||'video/webm',type=full.split(';')[0];
-  const blob=new Blob(chunks,{type});blob.xOk=/mp4/.test(type)&&/avc1/.test(full);
+  const blob=new Blob(chunks,{type});blob.xOk=/mp4/.test(type)&&/avc1/.test(full)&&/mp4a/.test(full);
+  return blob;
+}
+/* --- 録画でMP4を作れないブラウザ向け：WebCodecsで1コマずつ符号化し、MP4に詰める（Xに載せられる形式） --- */
+let WC_A={codec:'mp4a.40.2',mux:'aac'};
+const WC_V={codec:'avc1.42E01F',width:720,height:720,bitrate:3500000,framerate:30,avc:{format:'avc'}};
+let wcOk=null,muxLoad=null;
+async function canClipWC(){
+  if(wcOk!==null)return wcOk;
+  wcOk=false;
+  try{
+    if(window.VideoEncoder&&window.AudioEncoder&&window.VideoFrame&&window.AudioData&&window.OfflineAudioContext){
+      const v=await VideoEncoder.isConfigSupported(WC_V),a=await AudioEncoder.isConfigSupported({codec:WC_A.codec,sampleRate:48000,numberOfChannels:2,bitrate:128000});
+      wcOk=!!(v.supported&&a.supported);
+    }
+  }catch(e){wcOk=false}
+  return wcOk;
+}
+// MP4に詰める部品は使うときだけ読む（同じ場所に置いたファイル、無ければCDN）
+function loadMuxer(){
+  if(window.Mp4Muxer)return Promise.resolve(window.Mp4Muxer);
+  if(muxLoad)return muxLoad;
+  const add=src=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=()=>window.Mp4Muxer?res(window.Mp4Muxer):rej(new Error('mux'));s.onerror=()=>{s.remove();rej(new Error('mux'))};document.head.append(s)});
+  muxLoad=add('vendor/mp4-muxer.min.js').catch(()=>add('https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.js')).catch(e=>{muxLoad=null;throw e});
+  return muxLoad;
+}
+async function recordClipWC(b,canvas,onProg){
+  await fontsReady(b);ac();
+  const M=await loadMuxer(),g=canvas.getContext('2d'),P=clipPlan(b),SR=48000,FPS=30;
+  // 音：本番の録画と同じ鳴らし方を、オフラインでまとめて作る
+  const len=Math.ceil((P.TEND+0.2)*SR),oc=new OfflineAudioContext(2,len,SR),out=oc.createGain();
+  const lim=oc.createDynamicsCompressor();lim.threshold.value=-8;lim.knee.value=2;lim.ratio.value=16;lim.attack.value=0.002;lim.release.value=0.12;
+  out.connect(lim);lim.connect(oc.destination);
+  scheduleClipAudio(oc,out,b,P,0);
+  const ab=await oc.startRendering();
+  const target=new M.ArrayBufferTarget();
+  const mux=new M.Muxer({target,fastStart:'in-memory',firstTimestampBehavior:'offset',
+    video:{codec:'avc',width:720,height:720,frameRate:FPS},audio:{codec:WC_A.mux,numberOfChannels:2,sampleRate:SR}});
+  let err=null;
+  const ve=new VideoEncoder({output:(c,m)=>mux.addVideoChunk(c,m),error:e=>err=e});ve.configure(WC_V);
+  const ae=new AudioEncoder({output:(c,m)=>mux.addAudioChunk(c,m),error:e=>err=e});ae.configure({codec:WC_A.codec,sampleRate:SR,numberOfChannels:2,bitrate:128000});
+  // 音を1024サンプルずつ渡す
+  const L=ab.getChannelData(0),R=ab.getChannelData(1),N=Math.ceil(P.TEND*SR);
+  for(let i=0;i<N;i+=1024){
+    const n=Math.min(1024,N-i),d=new Float32Array(n*2);d.set(L.subarray(i,i+n),0);d.set(R.subarray(i,i+n),n);
+    const a=new AudioData({format:'f32-planar',sampleRate:SR,numberOfFrames:n,numberOfChannels:2,timestamp:Math.round(i/SR*1e6),data:d});ae.encode(a);a.close();
+  }
+  // 絵：1コマずつ描いて渡す（実時間より速く終わる）
+  const F=Math.ceil(P.TEND*FPS);
+  for(let f=0;f<F;f++){
+    if(err)throw err;
+    drawClipFrame(g,b,f/FPS,P);
+    const vf=new VideoFrame(canvas,{timestamp:Math.round(f*1e6/FPS),duration:Math.round(1e6/FPS)});
+    ve.encode(vf,{keyFrame:f%60===0});vf.close();
+    onProg&&onProg(f/F);
+    if(ve.encodeQueueSize>6||f%4===3)await new Promise(r=>setTimeout(r,0));
+  }
+  await ve.flush();await ae.flush();ve.close();ae.close();
+  if(err)throw err;
+  mux.finalize();
+  const blob=new Blob([target.buffer],{type:'video/mp4'});blob.xOk=WC_A.mux==='aac';
   return blob;
 }
 /* --- 遊ばれた回数（GoatCounter。コードを入れると数え始める） --- */
@@ -3226,16 +3286,22 @@ async function showShare(kind){
     catch(e){console.error(e);if(tok===shareTok)prev.innerHTML='<span class="wait">画像を作れませんでした</span>'}
     return;
   }
-  if(!canRecordClip()){prev.innerHTML='<span class="wait">このブラウザでは動画を作れません</span>';shareNote('画像なら作れます。');return}
+  // そのまま録画してMP4になるならそれで（声も流れる）。ならないならWebCodecsでMP4を作る。どちらも無理ならwebmで録る
+  const mm=canRecordClip()?pickMime():'',recMp4=/mp4/.test(mm)&&/avc1/.test(mm)&&/mp4a/.test(mm),wc=!recMp4&&await canClipWC();
+  if(tok!==shareTok)return;
+  if(!recMp4&&!wc&&!canRecordClip()){prev.innerHTML='<span class="wait">このブラウザでは動画を作れません</span>';shareNote('画像なら作れます。');return}
   const cv=document.createElement('canvas');cv.width=cv.height=720;cv.setAttribute('aria-label','作成中の動画');prev.replaceChildren(cv);
   clipBusy=true;$('#optImg').disabled=true;$('#optClip').disabled=true;
-  shareNote('動画を作っています。声が流れます（約6秒）');
+  shareNote(wc?'動画を作っています（数秒で終わります）':'動画を作っています。声が流れます（約6秒）');
   try{
-    const blob=await recordClip(player,cv,p=>{$('#shareGo').textContent=`作成中 ${Math.round(p*100)}%`});
+    const prog=p=>{$('#shareGo').textContent=`作成中 ${Math.round(p*100)}%`};
+    let blob=null,how='rec';
+    if(wc){try{blob=await recordClipWC(player,cv,prog);how='wc'}catch(e){console.error(e);blob=null}}
+    if(!blob){if(!canRecordClip())throw new Error('norec');shareNote('動画を作っています。声が流れます（約6秒）');blob=await recordClip(player,cv,prog);how='rec'}
     if(!blob.size)throw new Error('empty');
-    const ext=blob.type.includes('mp4')?'mp4':'webm';setShareItem(blob,ext);track('share/video-'+ext);
+    const ext=blob.type.includes('mp4')?'mp4':'webm';setShareItem(blob,ext);track('share/video-'+ext+(how==='wc'?'-wc':''));
     const vd=document.createElement('video');vd.src=shareItem.url;vd.controls=true;vd.playsInline=true;vd.loop=true;vd.setAttribute('aria-label',`「${player.name}」の叫びの動画`);prev.replaceChildren(vd);
-    shareNote(blob.xOk?'':'このブラウザで作った動画は、Xにそのまま載せられないことがあります。スマホのSafariかChromeで作ると確実です。');
+    shareNote(blob.xOk?'':'このブラウザで作れる動画の形式は、Xに載せられないことがあります。画像で自慢するか、スマホのSafariかChromeで作ってください。');
   }catch(e){console.error(e);prev.innerHTML='<span class="wait">動画を作れませんでした</span>';shareNote('画像で自慢してください。')}
   clipBusy=false;$('#optImg').disabled=false;$('#optClip').disabled=false;
 }
